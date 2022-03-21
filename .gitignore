@@ -2,3 +2,5 @@ libssh2.wasm
 libssh2/
 libssh2_build/
 openssl/
+coverage/
+node_modules/
