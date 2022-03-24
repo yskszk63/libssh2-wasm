@@ -1,6 +1,9 @@
+import { webcrypto as crypto } from "crypto";
+
 const EAGAIN = 6;
 const EBADF = 8;
 const EINVAL = 28;
+const ENOENT = 44;
 const ENOSYS = 52;
 
 export const FILETYPE_UNKNOWN = 0;
@@ -123,12 +126,26 @@ type WriteContext = {
   write: (b: Uint8Array) => Promise<number>
 }
 
-type Filedescriptor = {
+type SockFd = {
+  type: "socket"
   stat: Fdstat
   rcx?: ReadContext
   wcx?: WriteContext
-  waker: EventTarget
+  waker: EventTarget // TODO
 }
+
+type DirFd = {
+  type: "dir"
+  name: string
+  stat: Fdstat
+}
+
+type DevUrandomFd = {
+  type: "urandom"
+  stat: Fdstat
+}
+
+type Filedescriptor = SockFd | DirFd | DevUrandomFd
 
 type AddFdOption = {
   filetype: Filetype
@@ -280,22 +297,46 @@ class Ciovec {
   }
 }
 
+const FD_DEV = 3;
+
 export default class Wasi {
   #_memory: WebAssembly.Memory | undefined
   #fds: Record<number, Filedescriptor>
+  /**
+   * 0 .. stdin
+   * 1 .. stdout
+   * 2 .. stderr
+   * 3 .. /dev
+   */
   #nextfd: number
 
   constructor() {
-    this.#fds = {};
-    this.#nextfd = 3;
+    this.#fds = {
+      [FD_DEV]: {
+        type: "dir",
+        name: "/dev",
+        stat: {
+          fs_filetype: FILETYPE_DIRECTORY,
+          fs_flags: new Set(),
+          fs_rights_base: new Set([RIGHT_FD_READDIR]),
+          fs_rights_inheriting: new Set([]),
+        },
+      },
+    };
+    this.#nextfd = 4;
   }
 
   initialize(instance: WebAssembly.Instance) {
     const memory = instance.exports['memory'];
+    const _initialize = instance.exports['_initialize'];
     if (!(memory instanceof WebAssembly.Memory)) {
       throw new Error(`!${memory} instanceof WebAssembly.Memory`);
     }
+    if (typeof _initialize !== "function") {
+      throw new Error(`no _initialize found.`);
+    }
     this.#_memory = memory;
+    _initialize();
   }
 
   addFd(opts: AddFdOption): [number, () => Promise<void>] {
@@ -314,6 +355,7 @@ export default class Wasi {
     }
     const waker = new EventTarget();
     this.#fds[fd] = {
+      type: "socket",
       stat: {
         fs_filetype: opts.filetype,
         fs_flags: new Set(opts.flags),
@@ -355,6 +397,33 @@ export default class Wasi {
     return 0;
   }
 
+  fd_prestat_get(fd: number, result: number): number {
+    const fdi = this.#fds[fd];
+    if (!fdi || fdi.type !== "dir") {
+      return EBADF;
+    }
+
+    const name = new TextEncoder().encode(fdi.name);
+    const v = this.#memview;
+    v.setUint8(result + 0, 0); //  prestat tag -> dir
+    v.setUint32(result + 4, name.byteLength, true); //  prestat_dir pr_name_len
+    return 0;
+  }
+
+  fd_prestat_dir_name(fd: number, path: number, path_len: number): number {
+    const fdi = this.#fds[fd];
+    if (!fdi || fdi.type !== "dir") {
+      return EBADF;
+    }
+
+    const name = new TextEncoder().encode(fdi.name);
+    if (path_len < name.byteLength) {
+      return EINVAL;
+    }
+    new Uint8Array(this.#memory, path, path_len).set(name);
+    return 0;
+  }
+
   fd_fdstat_get(fd: number, result: number): number {
     if (!(fd in this.#fds)) {
       return EBADF;
@@ -369,12 +438,74 @@ export default class Wasi {
     return 0;
   }
 
+  fd_filestat_get(fd: number): number {
+    const fdi = this.#fds[fd];
+    switch (fdi?.type) {
+      case "urandom": {
+        // TODO
+        return 0;
+      }
+    }
+    return EINVAL;
+  }
+
+  fd_read(fd: number, iovs: number, iovs_len: number, result: number): number {
+    const fdi = this.#fds[fd];
+    switch (fdi?.type) {
+      case "urandom": {
+        let r = 0;
+        for (let i = 0; i < iovs_len; i++) {
+          const buf = new Iovec(this.#memview, iovs + (i * 8/*sizeof iovec*/)).buf;
+          crypto.getRandomValues(buf);
+          r += buf.byteLength;
+        }
+        this.#memview.setUint32(result, r, true);
+        return 0;
+      }
+    }
+    return EINVAL;
+  }
+
+  path_open(fd: number, _dirflags: number, path: number, path_len: number, oflags: number, fs_rights_base: number, fs_rights_inheriting: number, fdflags: number, result: number): number {
+    if (oflags || fdflags || fs_rights_base || fs_rights_inheriting) {
+      throw new Error("not implemented");
+      //return EINVAL;
+    }
+
+    const parent = this.#fds[fd];
+    if (!parent || parent.type !== "dir") {
+      return EINVAL;
+    }
+
+    const name = new TextDecoder().decode(new Uint8Array(this.#memory, path, path_len));
+    if (parent.name === "/dev" && name === "urandom") {
+      const nextfd = this.#nextfd++;
+      this.#fds[nextfd] = {
+        type: "urandom",
+        stat: {
+          fs_filetype: FILETYPE_CHARACTER_DEVICE,
+          fs_flags: new Set(),
+          fs_rights_base: new Set([RIGHT_FD_READ]),
+          fs_rights_inheriting: new Set([]),
+        }
+      }
+      this.#memview.setUint32(result, nextfd, true);
+      return 0;
+    }
+
+    return ENOENT;
+  }
+
   sock_recv(fd: number, ri_data: number, ri_data_len: number, ri_flags: number, result: number): number {
     if (ri_flags !== 0) {
       return ENOSYS;
     }
+    const fdi = this.#fds[fd];
+    if (!fdi || fdi.type !== "socket") {
+      return EINVAL;
+    }
 
-    const { rcx, waker } = this.#fds[fd] ?? {};
+    const { rcx, waker } = fdi;
     if (!rcx || !waker) {
       return EBADF;
     }
@@ -423,7 +554,12 @@ export default class Wasi {
   }
 
   sock_send(fd: number, si_data: number, si_data_len: number, _si_flags: number, result: number): number {
-    const { wcx, waker } = this.#fds[fd] ?? {};
+    const fdi = this.#fds[fd];
+    if (!fdi || fdi.type !== "socket") {
+      return EINVAL;
+    }
+
+    const { wcx, waker } = fdi;
     if (!wcx || !waker) {
       return EBADF;
     }
@@ -471,6 +607,9 @@ export default class Wasi {
           stored++;
 
           const fd = this.#fds[val.file_descriptor];
+          if (!fd || fd.type !== "socket") {
+            return EINVAL;
+          }
           event.type = EVENTTYPE_FD_READ;
           if (!fd || !fd.rcx) {
             event.errno = EBADF;
@@ -486,6 +625,9 @@ export default class Wasi {
           stored++;
 
           const fd = this.#fds[val.file_descriptor];
+          if (!fd || fd.type !== "socket") {
+            return EINVAL;
+          }
           event.type = EVENTTYPE_FD_WRITE;
           if (!fd || !fd.wcx) {
             event.errno = EBADF;
@@ -557,5 +699,3 @@ export default class Wasi {
     return Object.fromEntries(exports.map(name => [name, (it as any)[name]?.bind(it) ?? stub(name)]));
   }
 }
-
-

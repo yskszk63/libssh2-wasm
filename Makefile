@@ -19,12 +19,14 @@ openssl_configure_opts += no-asm
 openssl_configure_opts += no-sock
 openssl_configure_opts += no-dso
 openssl_configure_opts += no-afalgeng
+openssl_configure_opts += --with-rand-seed=devrandom
 
-openssl_target = linux-generic64
+openssl_target = linux-generic32
 
 openssl_cflags  = -DNO_SYSLOG
 openssl_cflags += -DOPENSSL_NO_UI_CONSOLE
 openssl_cflags += -DOPENSSL_NO_SECURE_MEMORY
+openssl_cflags += -DDEVRANDOM='\"/dev/urandom\"'
 openssl_cflags += -D_WASI_EMULATED_SIGNAL
 openssl_cflags += -D_WASI_EMULATED_PROCESS_CLOCKS
 openssl_cflags += -D_WASI_EMULATED_MMAN
@@ -33,13 +35,14 @@ openssl_ldflags  = -lwasi-emulated-signal
 openssl_ldflags += -lwasi-emulated-process-clocks
 openssl_ldflags += -lwasi-emulated-mman
 
-libssh2_ldflags  = -nostartfiles
-libssh2_ldflags += -Wl,--no-entry
+#libssh2_ldflags  = -nostartfiles
+#libssh2_ldflags += -Wl,--no-entry
 libssh2_ldflags += -Wl,--export-all
 libssh2_ldflags += -lwasi-emulated-signal
 libssh2_ldflags += -lwasi-emulated-process-clocks
 libssh2_ldflags += -lwasi-emulated-mman
 libssh2_ldflags += -Wl,--allow-undefined
+libssh2_ldflags += -mexec-model=reactor
 
 libssh2.wasm: $(libssh2_build_dir)/src/libssh2.so
 	cp $< $@
