@@ -1,4 +1,12 @@
+// TODO remove
 import { webcrypto as crypto } from "crypto";
+
+declare global {
+  // TODO no type definition in lib.dom.d.ts
+  type ReadableStreamBYOBReader = {
+    read(view: Uint8Array): Promise<{ value: Uint8Array, done: false } | { value: undefined, done: true }>
+  }
+}
 
 const EAGAIN = 6;
 const EBADF = 8;
@@ -134,6 +142,44 @@ type SockFd = {
   waker: EventTarget // TODO
 }
 
+type ReadContext2 = {
+  state: "connecting",
+} | {
+  state: "idle",
+  buf: Uint8Array,
+  reader: ReadableStreamBYOBReader,
+} | {
+  state: "reading",
+  reader: ReadableStreamBYOBReader,
+} | {
+  state: "eof",
+}
+
+type WriteContext2 = {
+  state: "connecting",
+} | {
+  state: "idle",
+  buf: Uint8Array
+  writer: WritableStreamDefaultWriter<Uint8Array>
+} | {
+  state: "writing",
+  writer: WritableStreamDefaultWriter<Uint8Array>
+} | {
+  state: "wrote",
+  len: number,
+  buf: Uint8Array
+  writer: WritableStreamDefaultWriter<Uint8Array>
+}
+
+// TODO
+type SockFd2 = {
+  type: "socket2"
+  stat: Fdstat
+  rcx: ReadContext2
+  wcx: WriteContext2
+  sig: Int32Array // for Atomics.notify / waitAsync
+}
+
 type DirFd = {
   type: "dir"
   name: string
@@ -145,7 +191,7 @@ type DevUrandomFd = {
   stat: Fdstat
 }
 
-type Filedescriptor = SockFd | DirFd | DevUrandomFd
+type Filedescriptor = SockFd | DirFd | DevUrandomFd | SockFd2
 
 type AddFdOption = {
   filetype: Filetype
@@ -298,6 +344,11 @@ class Ciovec {
 }
 
 const FD_DEV = 3;
+const FD_TCP = 4;
+
+type WasiConstructorOpts = {
+  netFactory?: (host: string, port: number) => Promise<[ReadableStream<Uint8Array>, WritableStream<Uint8Array>]>
+}
 
 export default class Wasi {
   #_memory: WebAssembly.Memory | undefined
@@ -307,10 +358,12 @@ export default class Wasi {
    * 1 .. stdout
    * 2 .. stderr
    * 3 .. /dev
+   * 4 .. /dev/tcp
    */
   #nextfd: number
+  #netFactory?: (host: string, port: number) => Promise<[ReadableStream<Uint8Array>, WritableStream<Uint8Array>]>
 
-  constructor() {
+  constructor(opts: WasiConstructorOpts = {}) {
     this.#fds = {
       [FD_DEV]: {
         type: "dir",
@@ -322,7 +375,18 @@ export default class Wasi {
           fs_rights_inheriting: new Set([]),
         },
       },
+      [FD_TCP]: {
+        type: "dir",
+        name: "/dev/tcp",
+        stat: {
+          fs_filetype: FILETYPE_DIRECTORY,
+          fs_flags: new Set(),
+          fs_rights_base: new Set([RIGHT_FD_READDIR]),
+          fs_rights_inheriting: new Set([]),
+        },
+      },
     };
+    this.#netFactory = opts.netFactory;
     this.#nextfd = 4;
   }
 
@@ -337,6 +401,18 @@ export default class Wasi {
     }
     this.#_memory = memory;
     _initialize();
+  }
+
+  async poll(fds: number[], _interests?: never[]): Promise<void> {
+    const waiters = [];
+    for (const fd of fds) {
+      const fdi = this.#fds[fd];
+      if (!fdi || fdi.type !== "socket2") {
+        throw new Error();
+      }
+      waiters.push((Atomics as any).waitAsync(fdi.sig, 0, 1)); // TODO
+    }
+    await Promise.race(waiters);
   }
 
   addFd(opts: AddFdOption): [number, () => Promise<void>] {
@@ -456,7 +532,7 @@ export default class Wasi {
         let r = 0;
         for (let i = 0; i < iovs_len; i++) {
           const buf = new Iovec(this.#memview, iovs + (i * 8/*sizeof iovec*/)).buf;
-          crypto.getRandomValues(buf);
+          (crypto as unknown as Crypto).getRandomValues(buf);
           r += buf.byteLength;
         }
         this.#memview.setUint32(result, r, true);
@@ -466,7 +542,17 @@ export default class Wasi {
     return EINVAL;
   }
 
-  path_open(fd: number, _dirflags: number, path: number, path_len: number, oflags: number, fs_rights_base: number, fs_rights_inheriting: number, fdflags: number, result: number): number {
+  path_open(
+    fd: number,
+    _dirflags: number,
+    path: number,
+    path_len: number,
+    oflags: number,
+    fs_rights_base: number,
+    fs_rights_inheriting: number,
+    fdflags: number,
+    result: number
+  ): number {
     if (oflags || fdflags || fs_rights_base || fs_rights_inheriting) {
       throw new Error("not implemented");
       //return EINVAL;
@@ -478,19 +564,78 @@ export default class Wasi {
     }
 
     const name = new TextDecoder().decode(new Uint8Array(this.#memory, path, path_len));
-    if (parent.name === "/dev" && name === "urandom") {
-      const nextfd = this.#nextfd++;
-      this.#fds[nextfd] = {
-        type: "urandom",
-        stat: {
-          fs_filetype: FILETYPE_CHARACTER_DEVICE,
-          fs_flags: new Set(),
-          fs_rights_base: new Set([RIGHT_FD_READ]),
-          fs_rights_inheriting: new Set([]),
+    switch (parent.name) {
+      case "/dev": {
+        if (name === "urandom") {
+          const nextfd = this.#nextfd++;
+          this.#fds[nextfd] = {
+            type: "urandom",
+            stat: {
+              fs_filetype: FILETYPE_CHARACTER_DEVICE,
+              fs_flags: new Set(),
+              fs_rights_base: new Set([RIGHT_FD_READ]),
+              fs_rights_inheriting: new Set([]),
+            }
+          }
+          this.#memview.setUint32(result, nextfd, true);
+          return 0;
         }
+        return EBADF;
       }
-      this.#memview.setUint32(result, nextfd, true);
-      return 0;
+
+      case "/dev/tcp": {
+        const factory = this.#netFactory;
+        if (!factory) {
+          return ENOSYS;
+        }
+
+        const [host, port] = name.split(":", 2);
+        if (!host || !port) {
+          return EBADF;
+        }
+        if (!Number(port)) {
+          return EBADF;
+        }
+
+        const fd: SockFd2 = {
+          type: "socket2",
+          stat: {
+            fs_filetype: FILETYPE_SOCKET_STREAM,
+            fs_flags: new Set([FDFLAGS_NONBLOCK]),
+            fs_rights_base: new Set([RIGHT_FD_READ, RIGHT_FD_WRITE]),
+            fs_rights_inheriting: new Set([]),
+          },
+          rcx: {
+            state: "connecting",
+          },
+          wcx: {
+            state: "connecting",
+          },
+          sig: new Int32Array(new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT * 2)),
+        }
+        factory(host, Number(port)).then(([r, w]) => {
+          fd.rcx = {
+            state: "idle",
+            buf: new Uint8Array(new ArrayBuffer(1024 * 8), 0, 0),
+            reader: (r as any).getReader({ mode: "byob" }), // TODO
+          }
+
+          fd.wcx = {
+            state: "idle",
+            buf: new Uint8Array(new ArrayBuffer(1024 * 8)),
+            writer: w.getWriter(),
+          }
+
+          fd.sig[0] = 1;
+          fd.sig[1] = 1;
+          Atomics.notify(fd.sig, 0);
+          Atomics.notify(fd.sig, 1);
+        });
+        const nextfd = this.#nextfd++;
+        this.#fds[nextfd] = fd;
+        this.#memview.setUint32(result, nextfd, true);
+        return 0;
+      }
     }
 
     return ENOENT;
@@ -501,93 +646,212 @@ export default class Wasi {
       return ENOSYS;
     }
     const fdi = this.#fds[fd];
-    if (!fdi || fdi.type !== "socket") {
+    if (!fdi || (fdi.type !== "socket" && fdi.type !== "socket2")) {
       return EINVAL;
     }
 
-    const { rcx, waker } = fdi;
-    if (!rcx || !waker) {
-      return EBADF;
-    }
-
-    switch (rcx.state) {
-      case "idle":
-        break;
-
-      case "reading":
-        return EAGAIN;
-
-      case "eof":
-        return 0;
-    }
-
-    const b = rcx.buf.subarray(rcx.pos, rcx.filled);
-    if (!b.length) {
-      rcx.filled = 0;
-      rcx.pos = 0;
-      rcx.state = "reading";
-      rcx.read(rcx.buf).then(n => {
-        waker.dispatchEvent(new globalThis.Event("wake"));
-        if (n === 0) {
-          rcx.state = "eof";
-          return;
+    switch (fdi.type) {
+      case "socket": {
+        const { rcx, waker } = fdi;
+        if (!rcx || !waker) {
+          return EBADF;
         }
-        rcx.state = "idle";
-        rcx.filled = n;
-      });
-      return EAGAIN;
-    }
 
-    let filled = 0;
-    for (let i = 0; i < ri_data_len; i++) {
-      const buf = new Iovec(this.#memview, ri_data + (i * 8/*sizeof iovec*/)).buf;
-      const len = Math.min(buf.byteLength, rcx.filled - rcx.pos);
-      buf.set(rcx.buf.subarray(rcx.pos, rcx.pos + len));
-      filled += len;
-      rcx.pos += len;
-      if (rcx.pos >= rcx.filled) {
-        break;
+        switch (rcx.state) {
+          case "idle":
+            break;
+
+          case "reading":
+            return EAGAIN;
+
+          case "eof":
+            return 0;
+        }
+
+        const b = rcx.buf.subarray(rcx.pos, rcx.filled);
+        if (!b.length) {
+          rcx.filled = 0;
+          rcx.pos = 0;
+          rcx.state = "reading";
+          rcx.read(rcx.buf).then(n => {
+            waker.dispatchEvent(new globalThis.Event("wake"));
+            if (n === 0) {
+              rcx.state = "eof";
+              return;
+            }
+            rcx.state = "idle";
+            rcx.filled = n;
+          });
+          return EAGAIN;
+        }
+
+        let filled = 0;
+        for (let i = 0; i < ri_data_len; i++) {
+          const buf = new Iovec(this.#memview, ri_data + (i * 8/*sizeof iovec*/)).buf;
+          const len = Math.min(buf.byteLength, rcx.filled - rcx.pos);
+          buf.set(rcx.buf.subarray(rcx.pos, rcx.pos + len));
+          filled += len;
+          rcx.pos += len;
+          if (rcx.pos >= rcx.filled) {
+            break;
+          }
+        }
+        this.#memview.setInt32(result, filled, true);
+        return 0;
+      }
+
+      case "socket2": {
+        switch (fdi.rcx.state) {
+          case "idle":
+            break;
+
+          case "connecting":
+            //fallthrough
+          case "reading":
+            return EAGAIN;
+
+          case "eof":
+            return 0;
+        }
+
+        let { buf } = fdi.rcx;
+        const { reader } = fdi.rcx;
+        if (!buf.length) {
+          fdi.rcx = {
+            state: "reading",
+            reader,
+          }
+          fdi.sig[0] = 0;
+          reader.read(new Uint8Array(buf.buffer)).then(({ value, done }) => {
+            fdi.sig[0] = 1;
+            Atomics.notify(fdi.sig, 0);
+
+            if (done) {
+              fdi.rcx = {
+                state: "eof",
+              }
+              return;
+            }
+
+            fdi.rcx = {
+              state: "idle",
+              buf: value,
+              reader,
+            }
+          }); // TODO catch
+          return EAGAIN;
+        }
+
+        let filled = 0;
+        for (let i = 0; i < ri_data_len; i++) {
+          const dst = new Iovec(this.#memview, ri_data + (i * 8/*sizeof iovec*/)).buf;
+          const len = Math.min(buf.byteLength, dst.byteLength);
+          dst.set(buf.subarray(buf.byteOffset, buf.byteOffset + len));
+          filled += len;
+          buf = buf.subarray(buf.byteOffset + len, buf.byteLength);
+          if (!buf.byteLength) {
+            break;
+          }
+        }
+        fdi.rcx.buf = buf;
+        this.#memview.setInt32(result, filled, true);
+        return 0;
       }
     }
-    this.#memview.setInt32(result, filled, true);
-    return 0;
   }
 
   sock_send(fd: number, si_data: number, si_data_len: number, _si_flags: number, result: number): number {
     const fdi = this.#fds[fd];
-    if (!fdi || fdi.type !== "socket") {
+    if (!fdi || (fdi.type !== "socket" && fdi.type !== "socket2")) {
       return EINVAL;
     }
 
-    const { wcx, waker } = fdi;
-    if (!wcx || !waker) {
-      return EBADF;
-    }
+    switch (fdi.type) {
+      case "socket": {
+        const { wcx, waker } = fdi;
+        if (!wcx || !waker) {
+          return EBADF;
+        }
 
-    switch (wcx.state) {
-      case "idle":
-        break;
+        switch (wcx.state) {
+          case "idle":
+            break;
 
-      case "writing":
+          case "writing":
+            return EAGAIN;
+        }
+        let filled = 0;
+        for (let i = 0; i < si_data_len; i++) {
+          const buf = new Ciovec(this.#memview, si_data + (i * 8/*sizeof ciovec*/)).buf;
+          const len = Math.min(buf.byteLength, wcx.buf.byteLength - filled);
+          wcx.buf.set(buf.subarray(0, len));
+          filled += len;
+          if (filled >= wcx.buf.byteLength) {
+            break;
+          }
+        }
+        wcx.write(wcx.buf.subarray(0, filled)).then(() => {
+          waker.dispatchEvent(new globalThis.Event("wake"));
+          wcx.state = "idle";
+        });
+        this.#memview.setInt32(result, filled, true);
+        return 0;
+      }
+
+      case "socket2": {
+        switch (fdi.wcx.state) {
+          case "idle":
+            break;
+
+          case "connecting":
+            //fallthrough
+          case "writing":
+            return EAGAIN;
+
+          case "wrote": {
+            const { len, buf, writer } = fdi.wcx;
+            fdi.wcx = {
+              state: "idle",
+              buf,
+              writer,
+            }
+            this.#memview.setInt32(result, len, true); // TODO on idle
+            return 0;
+          }
+        }
+        let { buf } = fdi.wcx;
+        const { writer } = fdi.wcx;
+
+        fdi.wcx = {
+          state: "writing",
+          writer,
+        }
+        fdi.sig[1] = 0;
+
+        for (let i = 0; i < si_data_len; i++) {
+          const src = new Ciovec(this.#memview, si_data + (i * 8/*sizeof ciovec*/)).buf;
+          const len = Math.min(buf.byteLength, src.byteLength);
+          buf.set(src.subarray(0, len));
+          buf = buf.subarray(buf.byteOffset + len);
+          if (!buf.byteLength) {
+            break;
+          }
+        }
+        buf = new Uint8Array(buf.buffer, 0, buf.byteOffset);
+        fdi.wcx.writer.write(buf).then(() => {
+          fdi.sig[1] = 1;
+          Atomics.notify(fdi.sig, 1);
+
+          fdi.wcx = {
+            state: "wrote",
+            len: buf.byteLength,
+            buf: new Uint8Array(buf.buffer),
+            writer,
+          }
+        }); // TODO catch
         return EAGAIN;
-    }
-    wcx.state = "writing";
-    let filled = 0;
-    for (let i = 0; i < si_data_len; i++) {
-      const buf = new Ciovec(this.#memview, si_data + (i * 8/*sizeof ciovec*/)).buf;
-      const len = Math.min(buf.byteLength, wcx.buf.byteLength - filled);
-      wcx.buf.set(buf.subarray(0, len));
-      filled += len;
-      if (filled >= wcx.buf.byteLength) {
-        break;
       }
     }
-    wcx.write(wcx.buf.subarray(0, filled)).then(() => {
-      waker.dispatchEvent(new globalThis.Event("wake"));
-      wcx.state = "idle";
-    });
-    this.#memview.setInt32(result, filled, true);
-    return 0;
   }
 
   poll_oneoff(in_: number, out: number, nsubscriptions: number, result: number): number {
