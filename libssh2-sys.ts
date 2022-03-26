@@ -2,7 +2,8 @@ import fs from "fs/promises";
 import net from "net";
 import { ReadableStream, WritableStream } from "stream/web";
 
-import Wasi, * as w from "./src/wasi";
+import Wasi from "./src/wasi";
+import * as sys from "./src/sys";
 
 async function instatiate(): Promise<[Wasi, WebAssembly.Instance]> {
   const wasi = new Wasi({
@@ -81,12 +82,15 @@ async function instatiate(): Promise<[Wasi, WebAssembly.Instance]> {
 
 const [wasi, instance] = await instatiate();
 
+if (!sys.isWasiExports(instance.exports) || !sys.isCExports(instance.exports) || !sys.isLibssh2Exports(instance.exports)) {
+  throw new Error();
+}
+
 const {
   memory,
   malloc,
   free,
   open,
-  libssh2_version,
   libssh2_init,
   libssh2_session_init_ex,
   libssh2_session_free,
@@ -105,81 +109,16 @@ const {
   libssh2_channel_read_ex,
 } = instance.exports;
 
-if (!(memory instanceof WebAssembly.Memory)) {
-  throw new Error();
-}
-if (typeof malloc !== "function") {
-  throw new Error();
-}
-if (typeof free !== "function") {
-  throw new Error();
-}
-if (typeof open !== "function") {
-  throw new Error();
-}
-if (typeof libssh2_version !== "function") {
-  throw new Error();
-}
-if (typeof libssh2_init !== "function") {
-  throw new Error();
-}
-if (typeof libssh2_session_init_ex !== "function") {
-  throw new Error();
-}
-if (typeof libssh2_session_free !== "function") {
-  throw new Error();
-}
-if (typeof libssh2_session_set_blocking !== "function") {
-  throw new Error();
-}
-if (typeof libssh2_session_handshake !== "function") {
-  throw new Error();
-}
-if (typeof libssh2_session_last_error !== "function") {
-  throw new Error();
-}
-if (typeof libssh2_session_last_errno !== "function") {
-  throw new Error();
-}
-if (typeof libssh2_userauth_authenticated !== "function") {
-  throw new Error();
-}
-if (typeof libssh2_userauth_publickey_frommemory !== "function") {
-  throw new Error();
-}
-if (typeof libssh2_channel_open_ex !== "function") {
-  throw new Error();
-}
-if (typeof libssh2_channel_close !== "function") {
-  throw new Error();
-}
-if (typeof libssh2_channel_wait_closed !== "function") {
-  throw new Error();
-}
-if (typeof libssh2_channel_process_startup !== "function") {
-  throw new Error();
-}
-if (typeof libssh2_channel_send_eof !== "function") {
-  throw new Error();
-}
-if (typeof libssh2_channel_eof !== "function") {
-  throw new Error();
-}
-if (typeof libssh2_channel_read_ex !== "function") {
-  throw new Error();
-}
-
 if (libssh2_init(0)) {
   throw new Error();
 }
 
-const session = libssh2_session_init_ex(null, null, null, null);
+const session = libssh2_session_init_ex(0, 0, 0, 0);
 if (!session) {
   throw new Error();
 }
 try {
   libssh2_session_set_blocking(session, 0);
-
 
   /*
   0x0400_0000 O_RDONLY
@@ -194,6 +133,7 @@ try {
   }
 
   while (true) {
+    await wasi.poll([fd]);
     const ret = libssh2_session_handshake(session, fd);
     if (ret === 0) {
       break;
@@ -201,7 +141,7 @@ try {
     if (ret !== -37/*LIBSSH2_ERROR_EAGAIN*/) {
       const ptr = malloc(4);
       const len = malloc(4);
-      libssh2_session_last_error(session, ptr, len, null);
+      libssh2_session_last_error(session, ptr, len, 0);
       const v = new DataView(memory.buffer);
       const c = v.getUint32(ptr, true);
       const l = v.getUint32(len, true);
@@ -210,7 +150,7 @@ try {
       free(len);
       throw new Error(`${ret} ${err}`);
     }
-    await wasi.poll([fd]);
+    //await wasi.poll([fd]);
   }
 
   const username = new TextEncoder().encode("yskszk63");
@@ -229,14 +169,14 @@ try {
       //publickeydata, publickeydata.byteLength,
       0, 0,
       pprivatekey, privatekeydata.byteLength,
-      null);
+      0);
     if (!ret) {
       break;
     }
     if (ret !== -37/*LIBSSH2_ERROR_EAGAIN*/) {
       const ptr = malloc(4);
       const len = malloc(4);
-      libssh2_session_last_error(session, ptr, len, null);
+      libssh2_session_last_error(session, ptr, len, 0);
       const v = new DataView(memory.buffer);
       const c = v.getUint32(ptr, true);
       const l = v.getUint32(len, true);
@@ -252,8 +192,8 @@ try {
   let channel = 0;
   while (channel === 0) {
     const channeltype = new TextEncoder().encode("session");
-    const pchanneltype = malloc(session.byteLength);
-    new Uint8Array(memory.buffer, pchanneltype, session.byteLength).set(channeltype);
+    const pchanneltype = malloc(channeltype.byteLength);
+    new Uint8Array(memory.buffer, pchanneltype, channeltype.byteLength).set(channeltype);
 
     const ret = libssh2_channel_open_ex(session, pchanneltype, channeltype.byteLength,
                                         (2*1024*1024), // LIBSSH2_CHANNEL_WINDOW_DEFAULT
@@ -266,7 +206,7 @@ try {
     if (libssh2_session_last_errno(session) !== -37/*LIBSSH2_ERROR_EAGAIN*/) {
       const ptr = malloc(4);
       const len = malloc(4);
-      libssh2_session_last_error(session, ptr, len, null);
+      libssh2_session_last_error(session, ptr, len, 0);
       const v = new DataView(memory.buffer);
       const c = v.getUint32(ptr, true);
       const l = v.getUint32(len, true);
@@ -298,7 +238,7 @@ try {
       if (ret !== -37/*LIBSSH2_ERROR_EAGAIN*/) {
         const ptr = malloc(4);
         const len = malloc(4);
-        libssh2_session_last_error(session, ptr, len, null);
+        libssh2_session_last_error(session, ptr, len, 0);
         const v = new DataView(memory.buffer);
         const c = v.getUint32(ptr, true);
         const l = v.getUint32(len, true);
@@ -319,7 +259,7 @@ try {
       if (ret !== -37/*LIBSSH2_ERROR_EAGAIN*/) {
         const ptr = malloc(4);
         const len = malloc(4);
-        libssh2_session_last_error(session, ptr, len, null);
+        libssh2_session_last_error(session, ptr, len, 0);
         const v = new DataView(memory.buffer);
         const c = v.getUint32(ptr, true);
         const l = v.getUint32(len, true);
@@ -343,7 +283,7 @@ try {
         if (libssh2_session_last_errno(session) !== -37/*LIBSSH2_ERROR_EAGAIN*/) {
           const ptr = malloc(4);
           const len = malloc(4);
-          libssh2_session_last_error(session, ptr, len, null);
+          libssh2_session_last_error(session, ptr, len, 0);
           const v = new DataView(memory.buffer);
           const c = v.getUint32(ptr, true);
           const l = v.getUint32(len, true);
@@ -362,7 +302,7 @@ try {
         if (libssh2_session_last_errno(session) !== -37/*LIBSSH2_ERROR_EAGAIN*/) {
           const ptr = malloc(4);
           const len = malloc(4);
-          libssh2_session_last_error(session, ptr, len, null);
+          libssh2_session_last_error(session, ptr, len, 0);
           const v = new DataView(memory.buffer);
           const c = v.getUint32(ptr, true);
           const l = v.getUint32(len, true);
@@ -387,7 +327,7 @@ try {
       if (ret !== -37/*LIBSSH2_ERROR_EAGAIN*/) {
         const ptr = malloc(4);
         const len = malloc(4);
-        libssh2_session_last_error(session, ptr, len, null);
+        libssh2_session_last_error(session, ptr, len, 0);
         const v = new DataView(memory.buffer);
         const c = v.getUint32(ptr, true);
         const l = v.getUint32(len, true);
@@ -409,7 +349,7 @@ try {
       if (ret !== -37/*LIBSSH2_ERROR_EAGAIN*/) {
         const ptr = malloc(4);
         const len = malloc(4);
-        libssh2_session_last_error(session, ptr, len, null);
+        libssh2_session_last_error(session, ptr, len, 0);
         const v = new DataView(memory.buffer);
         const c = v.getUint32(ptr, true);
         const l = v.getUint32(len, true);

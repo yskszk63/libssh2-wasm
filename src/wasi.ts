@@ -14,14 +14,14 @@ const EINVAL = 28;
 const ENOENT = 44;
 const ENOSYS = 52;
 
-export const FILETYPE_UNKNOWN = 0;
-export const FILETYPE_BLOCK_DEVICE = 1;
-export const FILETYPE_CHARACTER_DEVICE = 2;
-export const FILETYPE_DIRECTORY = 3;
-export const FILETYPE_REGULAR = 4;
-export const FILETYPE_SOCKET_DGRAM = 5;
-export const FILETYPE_SOCKET_STREAM = 6;
-export const FILETYPE_SYMBOLIC_LINK = 7;
+const FILETYPE_UNKNOWN = 0;
+const FILETYPE_BLOCK_DEVICE = 1;
+const FILETYPE_CHARACTER_DEVICE = 2;
+const FILETYPE_DIRECTORY = 3;
+const FILETYPE_REGULAR = 4;
+const FILETYPE_SOCKET_DGRAM = 5;
+const FILETYPE_SOCKET_STREAM = 6;
+const FILETYPE_SYMBOLIC_LINK = 7;
 
 type Filetype =
 | typeof FILETYPE_UNKNOWN
@@ -33,11 +33,11 @@ type Filetype =
 | typeof FILETYPE_SOCKET_STREAM
 | typeof FILETYPE_SYMBOLIC_LINK
 
-export const FDFLAGS_APPEND = 1 << 0;
-export const FDFLAGS_DSYNC = 1 << 1;
-export const FDFLAGS_NONBLOCK = 1 << 2;
-export const FDFLAGS_RSYNC = 1 << 3;
-export const FDFLAGS_SYNC = 1 << 4;
+const FDFLAGS_APPEND = 1 << 0;
+const FDFLAGS_DSYNC = 1 << 1;
+const FDFLAGS_NONBLOCK = 1 << 2;
+const FDFLAGS_RSYNC = 1 << 3;
+const FDFLAGS_SYNC = 1 << 4;
 
 type Fdflag =
 | typeof FDFLAGS_APPEND
@@ -46,36 +46,36 @@ type Fdflag =
 | typeof FDFLAGS_RSYNC
 | typeof FDFLAGS_SYNC
 
-export const RIGHT_FD_DATASYNC = 1n << 0n;
-export const RIGHT_FD_READ = 1n << 1n;
-export const RIGHT_FD_SEEK = 1n << 2n;
-export const RIGHT_FD_FDSTAT_SET_FLAGS = 1n << 3n;
-export const RIGHT_FD_SYNC = 1n << 4n;
-export const RIGHT_FD_TELL = 1n << 5n;
-export const RIGHT_FD_WRITE = 1n << 6n;
-export const RIGHT_FD_ADVICE = 1n << 7n;
-export const RIGHT_FD_ALLOCATE = 1n << 8n;
-export const RIGHT_PATH_CRATE_DIRECTORY = 1n << 9n;
-export const RIGHT_PATH_CREATE_FILE = 1n << 10n;
-export const RIGHT_PATH_LINK_SOURCE = 1n << 11n;
-export const RIGHT_PATH_LINK_TARGET = 1n << 12n;
-export const RIGHT_PATH_OPEN = 1n << 13n;
-export const RIGHT_FD_READDIR = 1n << 14n;
-export const RIGHT_PATH_READLINK = 1n << 15n;
-export const RIGHT_PATH_RENAME_SOURCE = 1n << 16n;
-export const RIGHT_PATH_RENAME_TARGET = 1n << 17n;
-export const RIGHT_PATH_FILESTAT_GET = 1n << 18n;
-export const RIGHT_PATH_FILESTAT_SET_SIZE = 1n << 19n;
-export const RIGHT_PATH_FILESTAT_SET_TIMES = 1n << 20n;
-export const RIGHT_FD_FILESTAT_GET = 1n << 21n;
-export const RIGHT_FD_FILESTAT_SET_SIZE = 1n << 22n;
-export const RIGHT_FD_FILESTAT_SET_TIMES = 1n << 23n;
-export const RIGHT_PATH_LINK = 1n << 24n;
-export const RIGHT_PATH_REMOVE_DIRECTORY = 1n << 25n;
-export const RIGHT_PATH_UNLINK_FILE = 1n << 26n;
-export const RIGHT_FD_READWRITE = 1n << 27n;
-export const RIGHT_SOCK_SHUTDOWN = 1n << 28n;
-export const RIGHT_SOCK_ACCEPT = 1n << 29n;
+const RIGHT_FD_DATASYNC = 1n << 0n;
+const RIGHT_FD_READ = 1n << 1n;
+const RIGHT_FD_SEEK = 1n << 2n;
+const RIGHT_FD_FDSTAT_SET_FLAGS = 1n << 3n;
+const RIGHT_FD_SYNC = 1n << 4n;
+const RIGHT_FD_TELL = 1n << 5n;
+const RIGHT_FD_WRITE = 1n << 6n;
+const RIGHT_FD_ADVICE = 1n << 7n;
+const RIGHT_FD_ALLOCATE = 1n << 8n;
+const RIGHT_PATH_CRATE_DIRECTORY = 1n << 9n;
+const RIGHT_PATH_CREATE_FILE = 1n << 10n;
+const RIGHT_PATH_LINK_SOURCE = 1n << 11n;
+const RIGHT_PATH_LINK_TARGET = 1n << 12n;
+const RIGHT_PATH_OPEN = 1n << 13n;
+const RIGHT_FD_READDIR = 1n << 14n;
+const RIGHT_PATH_READLINK = 1n << 15n;
+const RIGHT_PATH_RENAME_SOURCE = 1n << 16n;
+const RIGHT_PATH_RENAME_TARGET = 1n << 17n;
+const RIGHT_PATH_FILESTAT_GET = 1n << 18n;
+const RIGHT_PATH_FILESTAT_SET_SIZE = 1n << 19n;
+const RIGHT_PATH_FILESTAT_SET_TIMES = 1n << 20n;
+const RIGHT_FD_FILESTAT_GET = 1n << 21n;
+const RIGHT_FD_FILESTAT_SET_SIZE = 1n << 22n;
+const RIGHT_FD_FILESTAT_SET_TIMES = 1n << 23n;
+const RIGHT_PATH_LINK = 1n << 24n;
+const RIGHT_PATH_REMOVE_DIRECTORY = 1n << 25n;
+const RIGHT_PATH_UNLINK_FILE = 1n << 26n;
+const RIGHT_FD_READWRITE = 1n << 27n;
+const RIGHT_SOCK_SHUTDOWN = 1n << 28n;
+const RIGHT_SOCK_ACCEPT = 1n << 29n;
 
 type Right =
 | typeof RIGHT_FD_DATASYNC
