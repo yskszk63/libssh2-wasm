@@ -1,10 +1,56 @@
 import fs from "fs/promises";
 import net from "net";
+import { ReadableStream, WritableStream } from "stream/web";
 
 import Wasi, * as w from "./src/wasi";
 
 async function instatiate(): Promise<[Wasi, WebAssembly.Instance]> {
-  const wasi = new Wasi();
+  const wasi = new Wasi({
+    async netFactory(host, port) {
+      const sock = net.createConnection(port, host);
+      sock.pause();
+
+      const reader = new ReadableStream({
+        start(controller) {
+          sock.on("data", data => {
+            controller.enqueue(data);
+            sock.pause();
+          });
+          sock.on("error", err => {
+            controller.error(err);
+          });
+          sock.on("close", () => {
+            controller.close();
+          });
+        },
+        pull() {
+          sock.resume();
+        },
+        type: "bytes",
+      });
+
+      const writer = new WritableStream({
+        write(chunk) {
+          return new Promise((resolve, reject) => {
+            sock.write(chunk, (err) => {
+              if (err) {
+                return reject(err);
+              }
+              resolve();
+            });
+          });
+        },
+
+        close() {
+          return new Promise(resolve => {
+            sock.end(resolve);
+          });
+        },
+      });
+
+      return [reader, writer];
+    }
+  });
   const env = {
     getpid() {
       return 1;
@@ -39,6 +85,7 @@ const {
   memory,
   malloc,
   free,
+  open,
   libssh2_version,
   libssh2_init,
   libssh2_session_init_ex,
@@ -65,6 +112,9 @@ if (typeof malloc !== "function") {
   throw new Error();
 }
 if (typeof free !== "function") {
+  throw new Error();
+}
+if (typeof open !== "function") {
   throw new Error();
 }
 if (typeof libssh2_version !== "function") {
@@ -130,36 +180,18 @@ if (!session) {
 try {
   libssh2_session_set_blocking(session, 0);
 
-  const sock = net.connect(2222, "localhost");
-  //const sock = net.connect(22, "localhost");
-  const [fd, next] = wasi.addFd({
-    filetype: w.FILETYPE_SOCKET_STREAM,
-    flags: [w.FDFLAGS_NONBLOCK],
-    rights: [w.RIGHT_FD_READ, w.RIGHT_FD_WRITE],
-    writer: (buf) => {
-      //console.log(buf, new TextDecoder().decode(buf));
-      return new Promise((resolve, reject) => {
-        sock.write(buf, (err) => {
-          if (err) {
-            reject(err);
-            return;
-          }
-          resolve(buf.length);
-        });
-      });
-    },
-    reader: (buf) => {
-      return new Promise((resolve, reject) => {
-        sock.once("data", data => {
-          //console.log(data, data.toString());
-          buf.set(data);
-          resolve(data.length);
-        });
-        sock.once("end", () => resolve(0));
-        sock.once("error", reject);
-      });
-    },
-  });
+
+  /*
+  0x0400_0000 O_RDONLY
+  0x1000_0000 O_WRONLY
+  */
+  const path = new TextEncoder().encode("/dev/tcp/127.0.0.1:2222\0");
+  const ppath = malloc(path.byteLength);
+  new Uint8Array(memory.buffer, ppath, path.byteLength).set(path);
+  const fd: number = open(ppath, 0x0400_0000);
+  if (fd < 0) {
+    throw new Error();
+  }
 
   while (true) {
     const ret = libssh2_session_handshake(session, fd);
@@ -178,7 +210,7 @@ try {
       free(len);
       throw new Error(`${ret} ${err}`);
     }
-    await next();
+    await wasi.poll([fd]);
   }
 
   const username = new TextEncoder().encode("yskszk63");
@@ -213,7 +245,8 @@ try {
       free(len);
       throw new Error(`${ret} ${err}`);
     }
-    await next();
+    await wasi.poll([fd]);
+    //await next();
   }
 
   let channel = 0;
@@ -242,7 +275,8 @@ try {
       free(len);
       throw new Error(`${ret} ${err}`);
     }
-    await next();
+    await wasi.poll([fd]);
+    //await next();
   }
 
   try {
@@ -273,7 +307,8 @@ try {
         free(len);
         throw new Error(`${ret} ${err}`);
       }
-      await next();
+      await wasi.poll([fd]);
+      //await next();
     }
 
     while (true) {
@@ -293,7 +328,8 @@ try {
         free(len);
         throw new Error(`${ret} ${err}`);
       }
-      await next();
+      await wasi.poll([fd]);
+      //await next();
     }
 
     const buflen = 8192;
@@ -336,7 +372,8 @@ try {
           throw new Error(`${ret} ${err}`);
         }
       }
-      await next();
+      await wasi.poll([fd]);
+      //await next();
     }
 
   } finally {
@@ -360,7 +397,8 @@ try {
         console.log(`${ret} ${err}`); // TODO
         break;
       }
-      await next();
+      await wasi.poll([fd]);
+      //await next();
     }
 
     while (ok) {
@@ -381,7 +419,8 @@ try {
         console.error(`${ret} ${err}`);
         break;
       }
-      await next();
+      await wasi.poll([fd]);
+      //await next();
     }
   }
 

@@ -410,7 +410,14 @@ export default class Wasi {
       if (!fdi || fdi.type !== "socket2") {
         throw new Error();
       }
-      waiters.push((Atomics as any).waitAsync(fdi.sig, 0, 1)); // TODO
+
+      for (const i of [0, 1]) {
+        // TODO typing
+        const r = (Atomics as any).waitAsync(fdi.sig, i, 0) as { async: false, value: "not-equal" | "timed-out"} | { async: true, value: Promise<"ok" | "timed-out"> };
+        if (r.async) {
+          waiters.push(r.value);
+        }
+      }
     }
     await Promise.race(waiters);
   }
@@ -626,9 +633,9 @@ export default class Wasi {
             writer: w.getWriter(),
           }
 
-          fd.sig[0] = 1;
-          fd.sig[1] = 1;
+          Atomics.store(fd.sig, 0, 1);
           Atomics.notify(fd.sig, 0);
+          Atomics.store(fd.sig, 1, 1);
           Atomics.notify(fd.sig, 1);
         });
         const nextfd = this.#nextfd++;
@@ -746,9 +753,9 @@ export default class Wasi {
         for (let i = 0; i < ri_data_len; i++) {
           const dst = new Iovec(this.#memview, ri_data + (i * 8/*sizeof iovec*/)).buf;
           const len = Math.min(buf.byteLength, dst.byteLength);
-          dst.set(buf.subarray(buf.byteOffset, buf.byteOffset + len));
+          dst.set(buf.subarray(0, len));
           filled += len;
-          buf = buf.subarray(buf.byteOffset + len, buf.byteLength);
+          buf = buf.subarray(len);
           if (!buf.byteLength) {
             break;
           }
@@ -826,7 +833,8 @@ export default class Wasi {
           state: "writing",
           writer,
         }
-        fdi.sig[1] = 0;
+        Atomics.store(fdi.sig, 1, 0);
+        Atomics.notify(fdi.sig, 1);
 
         for (let i = 0; i < si_data_len; i++) {
           const src = new Ciovec(this.#memview, si_data + (i * 8/*sizeof ciovec*/)).buf;
@@ -839,7 +847,7 @@ export default class Wasi {
         }
         buf = new Uint8Array(buf.buffer, 0, buf.byteOffset);
         fdi.wcx.writer.write(buf).then(() => {
-          fdi.sig[1] = 1;
+          Atomics.store(fdi.sig, 1, 1);
           Atomics.notify(fdi.sig, 1);
 
           fdi.wcx = {
