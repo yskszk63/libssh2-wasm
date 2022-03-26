@@ -4,6 +4,7 @@ import { ReadableStream, WritableStream } from "stream/web";
 
 import Wasi from "./src/wasi";
 import * as sys from "./src/sys";
+import CEnv from "./src/cenv";
 
 async function instatiate(): Promise<[Wasi, WebAssembly.Instance]> {
   const wasi = new Wasi({
@@ -109,6 +110,8 @@ const {
   libssh2_channel_read_ex,
 } = instance.exports;
 
+const cenv = new CEnv(instance.exports);
+
 if (libssh2_init(0)) {
   throw new Error();
 }
@@ -124,100 +127,85 @@ try {
   0x0400_0000 O_RDONLY
   0x1000_0000 O_WRONLY
   */
-  const path = new TextEncoder().encode("/dev/tcp/127.0.0.1:2222\0");
-  const ppath = malloc(path.byteLength);
-  new Uint8Array(memory.buffer, ppath, path.byteLength).set(path);
-  const fd: number = open(ppath, 0x0400_0000);
-  if (fd < 0) {
-    throw new Error();
-  }
+  const fd = await cenv.with(["/dev/tcp/127.0.0.1:2222"], async ([path]) => {
+    return cenv.ccall(open, path.ptr, 0x0400_0000);
+  });
 
   while (true) {
-    await wasi.poll([fd]);
     const ret = libssh2_session_handshake(session, fd);
     if (ret === 0) {
       break;
     }
     if (ret !== -37/*LIBSSH2_ERROR_EAGAIN*/) {
-      const ptr = malloc(4);
-      const len = malloc(4);
-      libssh2_session_last_error(session, ptr, len, 0);
-      const v = new DataView(memory.buffer);
-      const c = v.getUint32(ptr, true);
-      const l = v.getUint32(len, true);
-      const err = new TextDecoder().decode(new Uint8Array(v.buffer, c, l));
-      free(ptr);
-      free(len);
-      throw new Error(`${ret} ${err}`);
+      cenv.with([cenv.malloc(4), cenv.malloc(4)], ([ptr, len]) => {
+        libssh2_session_last_error(session, ptr.ptr, len.ptr, 0);
+        const buf = cenv.ref(cenv.u32(ptr), cenv.u32(len));
+        throw new Error(cenv.str(buf));
+      });
     }
-    //await wasi.poll([fd]);
+    await wasi.poll([fd]);
   }
-
-  const username = new TextEncoder().encode("yskszk63");
-  const pusername = malloc(username.byteLength);
-  new Uint8Array(memory.buffer, pusername, username.byteLength).set(username);
 
   const privatekeydata = await fs.readFile(new URL("./test_id_ed25519", import.meta.url));
-  //const publickeydata = await fs.readFile(new URL("./test_id_ed25519.pub", import.meta.url));
-  const pprivatekey = malloc(privatekeydata.byteLength);
-  new Uint8Array(memory.buffer, pprivatekey, privatekeydata.byteLength).set(privatekeydata);
+  await cenv.with(["yskszk63", cenv.copy(privatekeydata)], async ([username, privatekeydata]) => {
+    while (!libssh2_userauth_authenticated(session)) {
+      while (true) {
+        const ret = libssh2_userauth_publickey_frommemory(
+          session,
+          (username.ptr ?? 0) - 1,
+          (username.len ?? 0),
+          0,
+          0,
+          privatekeydata.ptr,
+          privatekeydata.len ?? 0,
+          0,
+        );
+        if (ret === 0) {
+          break;
+        }
+        if (ret !== -37/*LIBSSH2_ERROR_EAGAIN*/) {
+          cenv.with([cenv.malloc(4), cenv.malloc(4)], ([ptr, len]) => {
+            libssh2_session_last_error(session, ptr.ptr, len.ptr, 0);
+            const buf = cenv.ref(cenv.u32(ptr), cenv.u32(len));
+            throw new Error(cenv.str(buf));
+          });
+        }
+        await wasi.poll([fd]);
+      }
+    }
+  });
 
-  while (!libssh2_userauth_authenticated(session)) {
-    const ret = libssh2_userauth_publickey_frommemory(
-      session,
-      pusername, username.byteLength,
-      //publickeydata, publickeydata.byteLength,
-      0, 0,
-      pprivatekey, privatekeydata.byteLength,
-      0);
-    if (!ret) {
-      break;
+  const channel = await cenv.with(["session"], async ([channeltype]) => {
+      console.log("1", channeltype.ptr, channeltype.len);
+      console.log("2", channeltype.ptr, channeltype.len);
+    while (true) {
+      console.log(channeltype.ptr, channeltype.len);
+      const ret = libssh2_channel_open_ex(
+        session,
+        channeltype.ptr,
+        (channeltype.len ?? 0) - 1,
+        (2*1024*1024), // LIBSSH2_CHANNEL_WINDOW_DEFAULT
+        32768, // LIBSSH2_CHANNEL_PACKET_DEFAULT
+        0,
+        0,
+      );
+      console.log(channeltype.ptr, channeltype.len);
+      if (ret > 0) {
+        return ret;
+      }
+      console.log(channeltype.ptr, channeltype.len);
+      if (libssh2_session_last_errno(session) !== -37/*LIBSSH2_ERROR_EAGAIN*/) {
+        cenv.with([cenv.malloc(4), cenv.malloc(4)], ([ptr, len]) => {
+          libssh2_session_last_error(session, ptr.ptr, len.ptr, 0);
+          const buf = cenv.ref(cenv.u32(ptr), cenv.u32(len));
+          throw new Error(cenv.str(buf));
+        });
+      }
+      console.log(channeltype.ptr, channeltype.len);
+      await wasi.poll([fd]);
+      console.log(channeltype.ptr, channeltype.len);
     }
-    if (ret !== -37/*LIBSSH2_ERROR_EAGAIN*/) {
-      const ptr = malloc(4);
-      const len = malloc(4);
-      libssh2_session_last_error(session, ptr, len, 0);
-      const v = new DataView(memory.buffer);
-      const c = v.getUint32(ptr, true);
-      const l = v.getUint32(len, true);
-      const err = new TextDecoder().decode(new Uint8Array(v.buffer, c, l));
-      free(ptr);
-      free(len);
-      throw new Error(`${ret} ${err}`);
-    }
-    await wasi.poll([fd]);
-    //await next();
-  }
-
-  let channel = 0;
-  while (channel === 0) {
-    const channeltype = new TextEncoder().encode("session");
-    const pchanneltype = malloc(channeltype.byteLength);
-    new Uint8Array(memory.buffer, pchanneltype, channeltype.byteLength).set(channeltype);
-
-    const ret = libssh2_channel_open_ex(session, pchanneltype, channeltype.byteLength,
-                                        (2*1024*1024), // LIBSSH2_CHANNEL_WINDOW_DEFAULT
-                                        32768, // LIBSSH2_CHANNEL_PACKET_DEFAULT
-                                        0, 0);
-    if (ret) {
-      channel = ret;
-      break;
-    }
-    if (libssh2_session_last_errno(session) !== -37/*LIBSSH2_ERROR_EAGAIN*/) {
-      const ptr = malloc(4);
-      const len = malloc(4);
-      libssh2_session_last_error(session, ptr, len, 0);
-      const v = new DataView(memory.buffer);
-      const c = v.getUint32(ptr, true);
-      const l = v.getUint32(len, true);
-      const err = new TextDecoder().decode(new Uint8Array(v.buffer, c, l));
-      free(ptr);
-      free(len);
-      throw new Error(`${ret} ${err}`);
-    }
-    await wasi.poll([fd]);
-    //await next();
-  }
+  });
 
   try {
     const request = new TextEncoder().encode("exec");

@@ -26,6 +26,7 @@ export type CExports = {
   malloc(size: number): number
   free(ptr: number): void
   open(pathname: number, flags: number): number
+  strerror(errnum: number): number
 }
 
 export function isCExports(item: WebAssembly.Exports): item is CExports & WebAssembly.Exports {
