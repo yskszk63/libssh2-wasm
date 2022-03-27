@@ -91,6 +91,7 @@ const {
   open,
   close,
   libssh2_init,
+  libssh2_exit,
   libssh2_session_init_ex,
   libssh2_session_free,
   libssh2_session_set_blocking,
@@ -98,6 +99,7 @@ const {
   libssh2_session_last_error,
   libssh2_session_last_errno,
   libssh2_session_disconnect_ex,
+  libssh2_session_hostkey,
   libssh2_userauth_authenticated,
   libssh2_userauth_publickey_frommemory,
   libssh2_channel_open_ex,
@@ -107,6 +109,11 @@ const {
   libssh2_channel_send_eof,
   libssh2_channel_eof,
   libssh2_channel_read_ex,
+  libssh2_channel_free,
+  libssh2_knownhost_init,
+  libssh2_knownhost_free,
+  libssh2_knownhost_readline,
+  libssh2_knownhost_checkp,
 } = instance.exports;
 
 const cenv = new CEnv(instance.exports);
@@ -144,6 +151,34 @@ try {
     }
     await wasi.poll([fd]);
   }
+
+  const khline = "[localhost]:2222 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMdYZGgT+jpoNO4HLbRPzAgDzApC1ASA8MI9qV4Mn9Z6";
+  cenv.with([cenv.malloc(4), khline, "localhost"], ([len, line, host]) => {
+    const fp = libssh2_session_hostkey(session, len.ptr, 0);
+    const fpbuf = cenv.ref(fp, cenv.u32(len));
+
+    const hosts = libssh2_knownhost_init(session);
+    if (hosts < 1) {
+      throw new Error();
+    }
+    try {
+      const r = libssh2_knownhost_readline(hosts, line.ptr, line.len ?? 0, 1/*LIBSSH2_KNOWNHOST_FILE_OPENSSH*/);
+      if (r) {
+        throw new Error();
+      }
+
+      const r2 = libssh2_knownhost_checkp(hosts, host.ptr, 2222, fpbuf.ptr, fpbuf.len ?? 0, 1/*LIBSSH2_KNOWNHOST_TYPE_PLAIN*/ | (1<<16)/*LIBSSH2_KNOWNHOST_KEYENC_RAW*/, 0);
+      // LIBSSH2_KNOWNHOST_CHECK_FAILURE 3
+      // LIBSSH2_KNOWNHOST_CHECK_NOTFOUND 2
+      // LIBSSH2_KNOWNHOST_CHECK_MATCH 0
+      // LIBSSH2_KNOWNHOST_CHECK_MISMATCH 1
+      if (r2 !== 0) {
+        throw new Error();
+      }
+    } finally {
+      libssh2_knownhost_free(hosts);
+    }
+  });
 
   const privatekeydata = await fs.readFile(new URL("./test_id_ed25519", import.meta.url));
   await cenv.with(["yskszk63", cenv.copy(privatekeydata)], async ([username, privatekeydata]) => {
@@ -305,6 +340,22 @@ try {
       await wasi.poll([fd]);
     }
 
+    while (true) {
+      const ret = libssh2_channel_free(channel);
+      if (!ret) {
+        break;
+      }
+      if (ret !== -37/*LIBSSH2_ERROR_EAGAIN*/) {
+        cenv.with([cenv.malloc(4), cenv.malloc(4)], ([ptr, len]) => {
+          libssh2_session_last_error(session, ptr.ptr, len.ptr, 0);
+          const buf = cenv.ref(cenv.u32(ptr), cenv.u32(len));
+          console.error(cenv.str(buf)); // TODO
+        });
+        break;
+      }
+      await wasi.poll([fd]);
+    }
+
     await cenv.with(["exit", "C"], async ([description, lang]) => {
       while (true) {
         const ret = libssh2_session_disconnect_ex(session, 11/*SSH_DISCONNECT_BY_APPLICATION*/, description.ptr, lang.ptr);
@@ -315,7 +366,7 @@ try {
           cenv.with([cenv.malloc(4), cenv.malloc(4)], ([ptr, len]) => {
             libssh2_session_last_error(session, ptr.ptr, len.ptr, 0);
             const buf = cenv.ref(cenv.u32(ptr), cenv.u32(len));
-            console.log(cenv.str(buf)); // TODO
+            console.error(cenv.str(buf)); // TODO
           });
           return;
         }
@@ -324,8 +375,9 @@ try {
     });
   }
 
-  //cenv.ccall(close, fd);
+  cenv.ccall(close, fd);
 
 } finally {
   libssh2_session_free(session);
+  libssh2_exit();
 }
