@@ -1,6 +1,7 @@
 import fs from "fs/promises";
 import net from "net";
 import { ReadableStream, WritableStream } from "stream/web";
+import { webcrypto } from "crypto";
 
 import Wasi from "./src/wasi";
 import * as sys from "./src/sys";
@@ -51,7 +52,8 @@ async function instatiate(): Promise<[Wasi, WebAssembly.Instance]> {
       });
 
       return [reader, writer];
-    }
+    },
+    crypto: webcrypto as any as Crypto, // TODO
   });
   const env = {
     getpid() {

@@ -1,6 +1,3 @@
-// TODO remove
-import { webcrypto as crypto } from "crypto";
-
 declare global {
   // TODO no type definition in lib.dom.d.ts
   type ReadableStreamBYOBReader = {
@@ -313,7 +310,8 @@ const FD_DEV = 3;
 const FD_TCP = 4;
 
 type WasiConstructorOpts = {
-  netFactory?: (host: string, port: number) => Promise<[ReadableStream<Uint8Array>, WritableStream<Uint8Array>]>
+  netFactory: (host: string, port: number) => Promise<[ReadableStream<Uint8Array>, WritableStream<Uint8Array>]>,
+  crypto: Crypto,
 }
 
 export default class Wasi {
@@ -328,8 +326,9 @@ export default class Wasi {
    */
   #nextfd: number
   #netFactory?: (host: string, port: number) => Promise<[ReadableStream<Uint8Array>, WritableStream<Uint8Array>]>
+  #crypto: Crypto
 
-  constructor(opts: WasiConstructorOpts = {}) {
+  constructor({ netFactory, crypto }: WasiConstructorOpts) {
     this.#fds = {
       [FD_DEV]: {
         type: "dir",
@@ -352,8 +351,9 @@ export default class Wasi {
         },
       },
     };
-    this.#netFactory = opts.netFactory;
+    this.#netFactory = netFactory;
     this.#nextfd = 4;
+    this.#crypto = crypto;
   }
 
   initialize(instance: WebAssembly.Instance) {
@@ -471,7 +471,7 @@ export default class Wasi {
         let r = 0;
         for (let i = 0; i < iovs_len; i++) {
           const buf = new Iovec(this.#memview, iovs + (i * 8/*sizeof iovec*/)).buf;
-          (crypto as unknown as Crypto).getRandomValues(buf);
+          this.#crypto.getRandomValues(buf);
           r += buf.byteLength;
         }
         this.#memview.setUint32(result, r, true);
