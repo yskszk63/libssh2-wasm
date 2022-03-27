@@ -88,10 +88,8 @@ if (!sys.isWasiExports(instance.exports) || !sys.isCExports(instance.exports) ||
 }
 
 const {
-  memory,
-  malloc,
-  free,
   open,
+  close,
   libssh2_init,
   libssh2_session_init_ex,
   libssh2_session_free,
@@ -99,6 +97,7 @@ const {
   libssh2_session_handshake,
   libssh2_session_last_error,
   libssh2_session_last_errno,
+  libssh2_session_disconnect_ex,
   libssh2_userauth_authenticated,
   libssh2_userauth_publickey_frommemory,
   libssh2_channel_open_ex,
@@ -201,36 +200,24 @@ try {
   });
 
   try {
-    const request = new TextEncoder().encode("exec");
-    const prequest = malloc(request.byteLength);
-    new Uint8Array(memory.buffer, prequest, request.byteLength).set(request);
-
-    const message = new TextEncoder().encode("whoami");
-    const pmessage = malloc(message.byteLength);
-    new Uint8Array(memory.buffer, pmessage, message.byteLength).set(message);
-
-    while (true) {
-      const ret = libssh2_channel_process_startup(channel, 
-                                                  prequest, request.byteLength,
-                                                  pmessage, message.byteLength);
-      if (!ret) {
-        break;
+    await cenv.with(["exec", "whoami"], async ([request, message]) => {
+      while (true) {
+        const ret = libssh2_channel_process_startup(channel,
+                                                    request.ptr, (request.len ?? 0) - 1,
+                                                    message.ptr, (message.len ?? 0) - 1);
+        if (!ret) {
+          return;
+        }
+        if (ret !== -37/*LIBSSH2_ERROR_EAGAIN*/) {
+          cenv.with([cenv.malloc(4), cenv.malloc(4)], ([ptr, len]) => {
+            libssh2_session_last_error(session, ptr.ptr, len.ptr, 0);
+            const buf = cenv.ref(cenv.u32(ptr), cenv.u32(len));
+            throw new Error(cenv.str(buf));
+          });
+        }
+        await wasi.poll([fd]);
       }
-      if (ret !== -37/*LIBSSH2_ERROR_EAGAIN*/) {
-        const ptr = malloc(4);
-        const len = malloc(4);
-        libssh2_session_last_error(session, ptr, len, 0);
-        const v = new DataView(memory.buffer);
-        const c = v.getUint32(ptr, true);
-        const l = v.getUint32(len, true);
-        const err = new TextDecoder().decode(new Uint8Array(v.buffer, c, l));
-        free(ptr);
-        free(len);
-        throw new Error(`${ret} ${err}`);
-      }
-      await wasi.poll([fd]);
-      //await next();
-    }
+    });
 
     while (true) {
       const ret = libssh2_channel_send_eof(channel);
@@ -238,112 +225,106 @@ try {
         break;
       }
       if (ret !== -37/*LIBSSH2_ERROR_EAGAIN*/) {
-        const ptr = malloc(4);
-        const len = malloc(4);
-        libssh2_session_last_error(session, ptr, len, 0);
-        const v = new DataView(memory.buffer);
-        const c = v.getUint32(ptr, true);
-        const l = v.getUint32(len, true);
-        const err = new TextDecoder().decode(new Uint8Array(v.buffer, c, l));
-        free(ptr);
-        free(len);
-        throw new Error(`${ret} ${err}`);
+        cenv.with([cenv.malloc(4), cenv.malloc(4)], ([ptr, len]) => {
+          libssh2_session_last_error(session, ptr.ptr, len.ptr, 0);
+          const buf = cenv.ref(cenv.u32(ptr), cenv.u32(len));
+          throw new Error(cenv.str(buf));
+        });
       }
       await wasi.poll([fd]);
-      //await next();
     }
 
-    const buflen = 8192;
-    const buf = malloc(buflen);
-    while (libssh2_channel_eof(channel) === 0) {
-      {
-        const ret = libssh2_channel_read_ex(channel, 0, buf, buflen);
-        if (ret >= 0) {
-          process.stdout.write(new Uint8Array(memory.buffer, buf, ret));
+    await cenv.with([cenv.malloc(8192)], async ([buf]) => {
+      while (libssh2_channel_eof(channel) === 0) {
+        {
+          const ret = libssh2_channel_read_ex(channel, 0, buf.ptr, buf.len ?? 0);
+          if (ret > 0) {
+            process.stdout.write(cenv.str(cenv.ref(buf.ptr, ret)));
+          }
+          if (libssh2_session_last_errno(session) !== -37/*LIBSSH2_ERROR_EAGAIN*/) {
+            cenv.with([cenv.malloc(4), cenv.malloc(4)], ([ptr, len]) => {
+              libssh2_session_last_error(session, ptr.ptr, len.ptr, 0);
+              const buf = cenv.ref(cenv.u32(ptr), cenv.u32(len));
+              throw new Error(cenv.str(buf));
+            });
+          }
         }
-        if (libssh2_session_last_errno(session) !== -37/*LIBSSH2_ERROR_EAGAIN*/) {
-          const ptr = malloc(4);
-          const len = malloc(4);
-          libssh2_session_last_error(session, ptr, len, 0);
-          const v = new DataView(memory.buffer);
-          const c = v.getUint32(ptr, true);
-          const l = v.getUint32(len, true);
-          const err = new TextDecoder().decode(new Uint8Array(v.buffer, c, l));
-          free(ptr);
-          free(len);
-          throw new Error(`${ret} ${err}`);
-        }
-      }
 
-      {
-        const ret = libssh2_channel_read_ex(channel, 1/*SSH_EXTENDED_DATA_STDERR*/, buf, buflen);
-        if (ret >= 0) {
-          process.stderr.write(new Uint8Array(memory.buffer, buf, ret));
+        {
+          const ret = libssh2_channel_read_ex(channel, 1/*SSH_EXTENDED_DATA_STDERR*/, buf.ptr, buf.len ?? 0);
+          if (ret > 0) {
+            process.stderr.write(cenv.str(cenv.ref(buf.ptr, ret)));
+          }
+          if (libssh2_session_last_errno(session) !== -37/*LIBSSH2_ERROR_EAGAIN*/) {
+            cenv.with([cenv.malloc(4), cenv.malloc(4)], ([ptr, len]) => {
+              libssh2_session_last_error(session, ptr.ptr, len.ptr, 0);
+              const buf = cenv.ref(cenv.u32(ptr), cenv.u32(len));
+              throw new Error(cenv.str(buf));
+            });
+          }
         }
-        if (libssh2_session_last_errno(session) !== -37/*LIBSSH2_ERROR_EAGAIN*/) {
-          const ptr = malloc(4);
-          const len = malloc(4);
-          libssh2_session_last_error(session, ptr, len, 0);
-          const v = new DataView(memory.buffer);
-          const c = v.getUint32(ptr, true);
-          const l = v.getUint32(len, true);
-          const err = new TextDecoder().decode(new Uint8Array(v.buffer, c, l));
-          free(ptr);
-          free(len);
-          throw new Error(`${ret} ${err}`);
+
+        if (libssh2_channel_eof(channel) === 1) {
+          return;
         }
+        await wasi.poll([fd]);
       }
-      await wasi.poll([fd]);
-      //await next();
-    }
+    });
 
   } finally {
-    let ok = false;
     while (true) {
       const ret = libssh2_channel_close(channel);
       if (!ret) {
-        ok = true;
         break;
       }
       if (ret !== -37/*LIBSSH2_ERROR_EAGAIN*/) {
-        const ptr = malloc(4);
-        const len = malloc(4);
-        libssh2_session_last_error(session, ptr, len, 0);
-        const v = new DataView(memory.buffer);
-        const c = v.getUint32(ptr, true);
-        const l = v.getUint32(len, true);
-        const err = new TextDecoder().decode(new Uint8Array(v.buffer, c, l));
-        free(ptr);
-        free(len);
-        console.log(`${ret} ${err}`); // TODO
+        cenv.with([cenv.malloc(4), cenv.malloc(4)], ([ptr, len]) => {
+          libssh2_session_last_error(session, ptr.ptr, len.ptr, 0);
+          const buf = cenv.ref(cenv.u32(ptr), cenv.u32(len));
+          console.log(cenv.str(buf)); // TODO
+        });
         break;
       }
       await wasi.poll([fd]);
       //await next();
     }
 
-    while (ok) {
+    while (libssh2_channel_eof(channel) === 1) {
       const ret = libssh2_channel_wait_closed(channel);
       if (!ret) {
         break;
       }
       if (ret !== -37/*LIBSSH2_ERROR_EAGAIN*/) {
-        const ptr = malloc(4);
-        const len = malloc(4);
-        libssh2_session_last_error(session, ptr, len, 0);
-        const v = new DataView(memory.buffer);
-        const c = v.getUint32(ptr, true);
-        const l = v.getUint32(len, true);
-        const err = new TextDecoder().decode(new Uint8Array(v.buffer, c, l));
-        free(ptr);
-        free(len);
-        console.error(`${ret} ${err}`);
+        cenv.with([cenv.malloc(4), cenv.malloc(4)], ([ptr, len]) => {
+          libssh2_session_last_error(session, ptr.ptr, len.ptr, 0);
+          const buf = cenv.ref(cenv.u32(ptr), cenv.u32(len));
+          console.log(cenv.str(buf)); // TODO
+        });
         break;
       }
       await wasi.poll([fd]);
-      //await next();
     }
+
+    await cenv.with(["exit", "C"], async ([description, lang]) => {
+      while (true) {
+        const ret = libssh2_session_disconnect_ex(session, 11/*SSH_DISCONNECT_BY_APPLICATION*/, description.ptr, lang.ptr);
+        if (ret === 0) {
+          return;
+        }
+        if (ret !== -37/*LIBSSH2_ERROR_EAGAIN*/) {
+          cenv.with([cenv.malloc(4), cenv.malloc(4)], ([ptr, len]) => {
+            libssh2_session_last_error(session, ptr.ptr, len.ptr, 0);
+            const buf = cenv.ref(cenv.u32(ptr), cenv.u32(len));
+            console.log(cenv.str(buf)); // TODO
+          });
+          return;
+        }
+        await wasi.poll([fd]);
+      }
+    });
   }
+
+  //cenv.ccall(close, fd);
 
 } finally {
   libssh2_session_free(session);

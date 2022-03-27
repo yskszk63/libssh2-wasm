@@ -26,6 +26,7 @@ export type CExports = {
   malloc(size: number): number
   free(ptr: number): void
   open(pathname: number, flags: number): number
+  close(fd: number): number
   strerror(errnum: number): number
 }
 
@@ -38,6 +39,7 @@ export function isCExports(item: WebAssembly.Exports): item is CExports & WebAss
     "malloc",
     "free",
     "open",
+    "close",
   ];
 
   for (const prop of props) {
@@ -58,6 +60,7 @@ export type Libssh2Exports = {
   libssh2_session_handshake(session: number, socket: number): number
   libssh2_session_last_error(session: number, errmsg: number, errmsg_len: number, want_buf: number): number
   libssh2_session_last_errno(session: number): number
+  libssh2_session_disconnect_ex(session: number, reason: number, description: number, lang: number): number
 
   libssh2_userauth_authenticated(session: number): number
   libssh2_userauth_publickey_frommemory(session: number, username: number, username_len: number, publickeydata: number, publickeydata_len: number, privatekeydata: number, privatekeydata_len: number, passphrase: number): number

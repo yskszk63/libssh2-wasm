@@ -580,6 +580,12 @@ export default class Wasi {
     return ENOENT;
   }
 
+  fd_close(fd: number): number {
+    delete this.#fds[fd];
+    // TODO cleanup resouce
+    return 0;
+  }
+
   sock_recv(fd: number, ri_data: number, ri_data_len: number, ri_flags: number, result: number): number {
     if (ri_flags !== 0) {
       return ENOSYS;
