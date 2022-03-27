@@ -370,7 +370,7 @@ export default class Wasi {
   }
 
   async poll(fds: number[], _interests?: never[]): Promise<void> {
-    const waiters = [];
+    const waiters: Promise<"ok" | "timed-out">[] = [];
     for (const fd of fds) {
       const fdi = this.#fds[fd];
       if (!fdi || fdi.type !== "socket") {
@@ -385,7 +385,9 @@ export default class Wasi {
         }
       }
     }
-    await Promise.race(waiters);
+    if (waiters.length) {
+      await Promise.race(waiters);
+    }
   }
 
   get #memory(): ArrayBuffer {

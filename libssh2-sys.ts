@@ -152,8 +152,8 @@ try {
       while (true) {
         const ret = libssh2_userauth_publickey_frommemory(
           session,
-          (username.ptr ?? 0) - 1,
-          (username.len ?? 0),
+          (username.ptr ?? 0),
+          (username.len ?? 0) - 1,
           0,
           0,
           privatekeydata.ptr,
@@ -176,10 +176,7 @@ try {
   });
 
   const channel = await cenv.with(["session"], async ([channeltype]) => {
-      console.log("1", channeltype.ptr, channeltype.len);
-      console.log("2", channeltype.ptr, channeltype.len);
     while (true) {
-      console.log(channeltype.ptr, channeltype.len);
       const ret = libssh2_channel_open_ex(
         session,
         channeltype.ptr,
@@ -189,11 +186,9 @@ try {
         0,
         0,
       );
-      console.log(channeltype.ptr, channeltype.len);
       if (ret > 0) {
         return ret;
       }
-      console.log(channeltype.ptr, channeltype.len);
       if (libssh2_session_last_errno(session) !== -37/*LIBSSH2_ERROR_EAGAIN*/) {
         cenv.with([cenv.malloc(4), cenv.malloc(4)], ([ptr, len]) => {
           libssh2_session_last_error(session, ptr.ptr, len.ptr, 0);
@@ -201,9 +196,7 @@ try {
           throw new Error(cenv.str(buf));
         });
       }
-      console.log(channeltype.ptr, channeltype.len);
       await wasi.poll([fd]);
-      console.log(channeltype.ptr, channeltype.len);
     }
   });
 
