@@ -117,7 +117,7 @@ export default class CEnv {
     return new CPtr(this, off, len, false);
   }
 
-  async with<R>(ss: Array<string | CPtr>, fn: (ptrs: CPtr[]) => Promise<R>): Promise<R> {
+  with<R>(ss: Array<string | CPtr>, fn: (ptrs: CPtr[]) => R): R {
     const allocs: CPtr[] = [];
     function free() {
       for (const ptr of allocs) {
@@ -127,6 +127,7 @@ export default class CEnv {
       }
     }
 
+    let r;
     try {
       for (const s of ss) {
         if (typeof s === "string") {
@@ -136,11 +137,19 @@ export default class CEnv {
           allocs.push(s);
         }
       }
-      return await fn(allocs);
+      r = fn(allocs);
 
-    } finally {
+    } catch(e) {
       free();
+      throw e;
     }
+
+    if (r instanceof Promise) {
+      r.finally(free);
+      return r;
+    }
+    free();
+    return r;
   }
 
   ccall<F extends Function>(fn: F, ...args: ArgumentTypes<F>): number {

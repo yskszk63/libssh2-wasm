@@ -127,7 +127,7 @@ try {
   0x0400_0000 O_RDONLY
   0x1000_0000 O_WRONLY
   */
-  const fd = await cenv.with(["/dev/tcp/127.0.0.1:2222"], async ([path]) => {
+  const fd = cenv.with(["/dev/tcp/127.0.0.1:2222"], ([path]) => {
     return cenv.ccall(open, path.ptr, 0x0400_0000);
   });
 
