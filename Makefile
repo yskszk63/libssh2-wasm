@@ -37,33 +37,214 @@ openssl_ldflags += -lwasi-emulated-mman
 
 #libssh2_ldflags  = -nostartfiles
 #libssh2_ldflags += -Wl,--no-entry
-libssh2_ldflags += -Wl,--export-all
+#libssh2_ldflags += -Wl,--export-all
 libssh2_ldflags += -lwasi-emulated-signal
 libssh2_ldflags += -lwasi-emulated-process-clocks
 libssh2_ldflags += -lwasi-emulated-mman
 libssh2_ldflags += -Wl,--allow-undefined
 libssh2_ldflags += -mexec-model=reactor
 
-libssh2.wasm: $(libssh2_build_dir)/src/libssh2.so
+
+libssh2_ldflags += -Wl,--export=errno
+libssh2_ldflags += -Wl,--export=malloc
+libssh2_ldflags += -Wl,--export=free
+libssh2_ldflags += -Wl,--export=open
+libssh2_ldflags += -Wl,--export=close
+libssh2_ldflags += -Wl,--export=strerror
+
+libssh2_ldflags += -Wl,--export=libssh2_agent_connect
+libssh2_ldflags += -Wl,--export=libssh2_agent_disconnect
+libssh2_ldflags += -Wl,--export=libssh2_agent_free
+libssh2_ldflags += -Wl,--export=libssh2_agent_get_identity
+libssh2_ldflags += -Wl,--export=libssh2_agent_get_identity_path
+libssh2_ldflags += -Wl,--export=libssh2_agent_init
+libssh2_ldflags += -Wl,--export=libssh2_agent_list_identities
+libssh2_ldflags += -Wl,--export=libssh2_agent_set_identity_path
+libssh2_ldflags += -Wl,--export=libssh2_agent_userauth
+libssh2_ldflags += -Wl,--export=libssh2_banner_set
+libssh2_ldflags += -Wl,--export=libssh2_base64_decode
+libssh2_ldflags += -Wl,--export=libssh2_channel_close
+libssh2_ldflags += -Wl,--export=libssh2_channel_direct_tcpip
+libssh2_ldflags += -Wl,--export=libssh2_channel_direct_tcpip_ex
+libssh2_ldflags += -Wl,--export=libssh2_channel_eof
+libssh2_ldflags += -Wl,--export=libssh2_channel_exec
+libssh2_ldflags += -Wl,--export=libssh2_channel_flush
+libssh2_ldflags += -Wl,--export=libssh2_channel_flush_ex
+libssh2_ldflags += -Wl,--export=libssh2_channel_flush_stderr
+libssh2_ldflags += -Wl,--export=libssh2_channel_forward_accept
+libssh2_ldflags += -Wl,--export=libssh2_channel_forward_cancel
+libssh2_ldflags += -Wl,--export=libssh2_channel_forward_listen
+libssh2_ldflags += -Wl,--export=libssh2_channel_forward_listen_ex
+libssh2_ldflags += -Wl,--export=libssh2_channel_free
+libssh2_ldflags += -Wl,--export=libssh2_channel_get_exit_signal
+libssh2_ldflags += -Wl,--export=libssh2_channel_get_exit_status
+libssh2_ldflags += -Wl,--export=libssh2_channel_handle_extended_data
+libssh2_ldflags += -Wl,--export=libssh2_channel_handle_extended_data2
+libssh2_ldflags += -Wl,--export=libssh2_channel_ignore_extended_data
+libssh2_ldflags += -Wl,--export=libssh2_channel_open_ex
+libssh2_ldflags += -Wl,--export=libssh2_channel_open_session
+libssh2_ldflags += -Wl,--export=libssh2_channel_process_startup
+libssh2_ldflags += -Wl,--export=libssh2_channel_read
+libssh2_ldflags += -Wl,--export=libssh2_channel_read_ex
+libssh2_ldflags += -Wl,--export=libssh2_channel_read_stderr
+libssh2_ldflags += -Wl,--export=libssh2_channel_receive_window_adjust
+libssh2_ldflags += -Wl,--export=libssh2_channel_receive_window_adjust2
+libssh2_ldflags += -Wl,--export=libssh2_channel_request_auth_agent
+libssh2_ldflags += -Wl,--export=libssh2_channel_request_pty
+libssh2_ldflags += -Wl,--export=libssh2_channel_request_pty_ex
+libssh2_ldflags += -Wl,--export=libssh2_channel_request_pty_size
+libssh2_ldflags += -Wl,--export=libssh2_channel_request_pty_size_ex
+libssh2_ldflags += -Wl,--export=libssh2_channel_send_eof
+libssh2_ldflags += -Wl,--export=libssh2_channel_set_blocking
+libssh2_ldflags += -Wl,--export=libssh2_channel_setenv
+libssh2_ldflags += -Wl,--export=libssh2_channel_setenv_ex
+libssh2_ldflags += -Wl,--export=libssh2_channel_shell
+libssh2_ldflags += -Wl,--export=libssh2_channel_subsystem
+libssh2_ldflags += -Wl,--export=libssh2_channel_wait_closed
+libssh2_ldflags += -Wl,--export=libssh2_channel_wait_eof
+libssh2_ldflags += -Wl,--export=libssh2_channel_window_read
+libssh2_ldflags += -Wl,--export=libssh2_channel_window_read_ex
+libssh2_ldflags += -Wl,--export=libssh2_channel_window_write
+libssh2_ldflags += -Wl,--export=libssh2_channel_window_write_ex
+libssh2_ldflags += -Wl,--export=libssh2_channel_write
+libssh2_ldflags += -Wl,--export=libssh2_channel_write_ex
+libssh2_ldflags += -Wl,--export=libssh2_channel_write_stderr
+libssh2_ldflags += -Wl,--export=libssh2_channel_x11_req
+libssh2_ldflags += -Wl,--export=libssh2_channel_x11_req_ex
+libssh2_ldflags += -Wl,--export=libssh2_exit
+libssh2_ldflags += -Wl,--export=libssh2_free
+libssh2_ldflags += -Wl,--export=libssh2_hostkey_hash
+libssh2_ldflags += -Wl,--export=libssh2_init
+libssh2_ldflags += -Wl,--export=libssh2_keepalive_config
+libssh2_ldflags += -Wl,--export=libssh2_keepalive_send
+libssh2_ldflags += -Wl,--export=libssh2_knownhost_add
+libssh2_ldflags += -Wl,--export=libssh2_knownhost_addc
+libssh2_ldflags += -Wl,--export=libssh2_knownhost_check
+libssh2_ldflags += -Wl,--export=libssh2_knownhost_checkp
+libssh2_ldflags += -Wl,--export=libssh2_knownhost_del
+libssh2_ldflags += -Wl,--export=libssh2_knownhost_free
+libssh2_ldflags += -Wl,--export=libssh2_knownhost_get
+libssh2_ldflags += -Wl,--export=libssh2_knownhost_init
+libssh2_ldflags += -Wl,--export=libssh2_knownhost_readfile
+libssh2_ldflags += -Wl,--export=libssh2_knownhost_readline
+libssh2_ldflags += -Wl,--export=libssh2_knownhost_writefile
+libssh2_ldflags += -Wl,--export=libssh2_knownhost_writeline
+libssh2_ldflags += -Wl,--export=libssh2_poll
+libssh2_ldflags += -Wl,--export=libssh2_poll_channel_read
+libssh2_ldflags += -Wl,--export=libssh2_publickey_add
+libssh2_ldflags += -Wl,--export=libssh2_publickey_add_ex
+libssh2_ldflags += -Wl,--export=libssh2_publickey_init
+libssh2_ldflags += -Wl,--export=libssh2_publickey_list_fetch
+libssh2_ldflags += -Wl,--export=libssh2_publickey_list_free
+libssh2_ldflags += -Wl,--export=libssh2_publickey_remove
+libssh2_ldflags += -Wl,--export=libssh2_publickey_remove_ex
+libssh2_ldflags += -Wl,--export=libssh2_publickey_shutdown
+libssh2_ldflags += -Wl,--export=libssh2_scp_recv
+libssh2_ldflags += -Wl,--export=libssh2_scp_recv2
+libssh2_ldflags += -Wl,--export=libssh2_scp_send
+libssh2_ldflags += -Wl,--export=libssh2_scp_send64
+libssh2_ldflags += -Wl,--export=libssh2_scp_send_ex
+libssh2_ldflags += -Wl,--export=libssh2_session_abstract
+libssh2_ldflags += -Wl,--export=libssh2_session_banner_get
+libssh2_ldflags += -Wl,--export=libssh2_session_banner_set
+libssh2_ldflags += -Wl,--export=libssh2_session_block_directions
+libssh2_ldflags += -Wl,--export=libssh2_session_callback_set
+libssh2_ldflags += -Wl,--export=libssh2_session_disconnect
+libssh2_ldflags += -Wl,--export=libssh2_session_disconnect_ex
+libssh2_ldflags += -Wl,--export=libssh2_session_flag
+libssh2_ldflags += -Wl,--export=libssh2_session_free
+libssh2_ldflags += -Wl,--export=libssh2_session_get_blocking
+libssh2_ldflags += -Wl,--export=libssh2_session_get_timeout
+libssh2_ldflags += -Wl,--export=libssh2_session_handshake
+libssh2_ldflags += -Wl,--export=libssh2_session_hostkey
+libssh2_ldflags += -Wl,--export=libssh2_session_init
+libssh2_ldflags += -Wl,--export=libssh2_session_init_ex
+libssh2_ldflags += -Wl,--export=libssh2_session_last_errno
+libssh2_ldflags += -Wl,--export=libssh2_session_last_error
+libssh2_ldflags += -Wl,--export=libssh2_session_method_pref
+libssh2_ldflags += -Wl,--export=libssh2_session_methods
+libssh2_ldflags += -Wl,--export=libssh2_session_set_blocking
+libssh2_ldflags += -Wl,--export=libssh2_session_set_last_error
+libssh2_ldflags += -Wl,--export=libssh2_session_set_timeout
+libssh2_ldflags += -Wl,--export=libssh2_session_startup
+libssh2_ldflags += -Wl,--export=libssh2_session_supported_algs
+libssh2_ldflags += -Wl,--export=libssh2_sftp_close
+libssh2_ldflags += -Wl,--export=libssh2_sftp_close_handle
+libssh2_ldflags += -Wl,--export=libssh2_sftp_closedir
+libssh2_ldflags += -Wl,--export=libssh2_sftp_fsetstat
+libssh2_ldflags += -Wl,--export=libssh2_sftp_fstat
+libssh2_ldflags += -Wl,--export=libssh2_sftp_fstat_ex
+libssh2_ldflags += -Wl,--export=libssh2_sftp_fstatvfs
+libssh2_ldflags += -Wl,--export=libssh2_sftp_fsync
+libssh2_ldflags += -Wl,--export=libssh2_sftp_get_channel
+libssh2_ldflags += -Wl,--export=libssh2_sftp_init
+libssh2_ldflags += -Wl,--export=libssh2_sftp_last_error
+libssh2_ldflags += -Wl,--export=libssh2_sftp_lstat
+libssh2_ldflags += -Wl,--export=libssh2_sftp_mkdir
+libssh2_ldflags += -Wl,--export=libssh2_sftp_mkdir_ex
+libssh2_ldflags += -Wl,--export=libssh2_sftp_open
+libssh2_ldflags += -Wl,--export=libssh2_sftp_open_ex
+libssh2_ldflags += -Wl,--export=libssh2_sftp_opendir
+libssh2_ldflags += -Wl,--export=libssh2_sftp_read
+libssh2_ldflags += -Wl,--export=libssh2_sftp_readdir
+libssh2_ldflags += -Wl,--export=libssh2_sftp_readdir_ex
+libssh2_ldflags += -Wl,--export=libssh2_sftp_readlink
+libssh2_ldflags += -Wl,--export=libssh2_sftp_realpath
+libssh2_ldflags += -Wl,--export=libssh2_sftp_rename
+libssh2_ldflags += -Wl,--export=libssh2_sftp_rename_ex
+libssh2_ldflags += -Wl,--export=libssh2_sftp_rewind
+libssh2_ldflags += -Wl,--export=libssh2_sftp_rmdir
+libssh2_ldflags += -Wl,--export=libssh2_sftp_rmdir_ex
+libssh2_ldflags += -Wl,--export=libssh2_sftp_seek
+libssh2_ldflags += -Wl,--export=libssh2_sftp_seek64
+libssh2_ldflags += -Wl,--export=libssh2_sftp_setstat
+libssh2_ldflags += -Wl,--export=libssh2_sftp_shutdown
+libssh2_ldflags += -Wl,--export=libssh2_sftp_stat
+libssh2_ldflags += -Wl,--export=libssh2_sftp_stat_ex
+libssh2_ldflags += -Wl,--export=libssh2_sftp_statvfs
+libssh2_ldflags += -Wl,--export=libssh2_sftp_symlink
+libssh2_ldflags += -Wl,--export=libssh2_sftp_symlink_ex
+libssh2_ldflags += -Wl,--export=libssh2_sftp_tell
+libssh2_ldflags += -Wl,--export=libssh2_sftp_tell64
+libssh2_ldflags += -Wl,--export=libssh2_sftp_unlink
+libssh2_ldflags += -Wl,--export=libssh2_sftp_unlink_ex
+libssh2_ldflags += -Wl,--export=libssh2_sftp_write
+libssh2_ldflags += -Wl,--export=libssh2_trace
+libssh2_ldflags += -Wl,--export=libssh2_trace_sethandler
+libssh2_ldflags += -Wl,--export=libssh2_userauth_authenticated
+libssh2_ldflags += -Wl,--export=libssh2_userauth_hostbased_fromfile
+libssh2_ldflags += -Wl,--export=libssh2_userauth_hostbased_fromfile_ex
+libssh2_ldflags += -Wl,--export=libssh2_userauth_keyboard_interactive
+libssh2_ldflags += -Wl,--export=libssh2_userauth_keyboard_interactive_ex
+libssh2_ldflags += -Wl,--export=libssh2_userauth_list
+libssh2_ldflags += -Wl,--export=libssh2_userauth_password
+libssh2_ldflags += -Wl,--export=libssh2_userauth_password_ex
+libssh2_ldflags += -Wl,--export=libssh2_userauth_publickey
+libssh2_ldflags += -Wl,--export=libssh2_userauth_publickey_fromfile
+libssh2_ldflags += -Wl,--export=libssh2_userauth_publickey_fromfile_ex
+libssh2_ldflags += -Wl,--export=libssh2_userauth_publickey_frommemory
+libssh2_ldflags += -Wl,--export=libssh2_version
+
+libssh2.wasm: $(libssh2_build_dir)/src/libssh2.so make-libssh2
 	cp $< $@
 
 .PHONY: make-libssh2
-make-libssh2:
+make-libssh2: make-openssl
 	$(RM) -rf $(libssh2_build_dir)
 	mkdir $(libssh2_build_dir)
-	$(CMAKE) -S $(libssh2_dir) -B $(libssh2_build_dir) --toolchain $(WASI_SDK_PREFIX)/share/cmake/wasi-sdk.cmake -DWASI_SDK_PREFIX=$(WASI_SDK_PREFIX) -DBUILD_SHARED_LIBS=ON -DCRYPTO_BACKEND=OpenSSL -DOPENSSL_CRYPTO_LIBRARY=$(openssl_dir)/libcrypto.a -DOPENSSL_SSL_LIBRARY=$(openssl_dir)/libssl.a -DOPENSSL_INCLUDE_DIR=$(openssl_dir)/include -DCMAKE_C_COMPILER_ID=Clang -DCMAKE_SHARED_LINKER_FLAGS="$(libssh2_ldflags)"
+	$(CMAKE) -S $(libssh2_dir) -B $(libssh2_build_dir) --toolchain $(WASI_SDK_PREFIX)/share/cmake/wasi-sdk.cmake -DWASI_SDK_PREFIX=$(WASI_SDK_PREFIX) -DBUILD_SHARED_LIBS=ON -DCRYPTO_BACKEND=OpenSSL -DOPENSSL_CRYPTO_LIBRARY=$(openssl_dir)/libcrypto.a -DOPENSSL_SSL_LIBRARY=$(openssl_dir)/libssl.a -DOPENSSL_INCLUDE_DIR=$(openssl_dir)/include -DCMAKE_C_COMPILER_ID=Clang -DCMAKE_SHARED_LINKER_FLAGS="$(libssh2_ldflags)" -DCMAKE_BUILD_TYPE=Release
 	$(CMAKE) --build $(libssh2_build_dir) --target libssh2
+
+.PHONY: make-openssl
+make-openssl:
+	cd $(openssl_dir) && CC=$(CC) AR=$(AR) RANLIB=$(RANLIB) ./Configure $(openssl_configure_opts) $(openssl_target)
+	$(MAKE) -C $(openssl_dir) build_libs CFLAGS="$(openssl_cflags)" LDFLAGS="$(openssl_ldflags)"
 
 .PHONY: fetch-libssh2
 fetch-libssh2:
 	$(RM) -rf $(libssh2_dir)
 	mkdir $(libssh2_dir)
 	curl -sSfL $(libssh2_url) | tar zxf - --strip-components=1 -C $(libssh2_dir)
-
-.PHONY: make-openssl
-make-openssl:
-	cd $(openssl_dir) && CC=$(CC) AR=$(AR) RANLIB=$(RANLIB) ./Configure $(openssl_configure_opts) $(openssl_target)
-	$(MAKE) -C $(openssl_dir) build_libs CFLAGS="$(openssl_cflags)" LDFLAGS="$(openssl_ldflags)"
 
 .PHONY: fetch-openssl
 fetch-openssl:
