@@ -75,6 +75,11 @@ export type Libssh2Exports = {
   libssh2_channel_eof(channel: number): number
   libssh2_channel_read_ex(channel: number, stream_id: number, buf: number, buflen: number): number
   libssh2_channel_free(channel: number): number
+  libssh2_channel_write_ex(channel: number, stream_id: number, buf: number, buflen: number): number
+  libssh2_channel_flush_ex(channel: number, stream_id: number): number
+  libssh2_channel_wait_eof(channel: number): number
+  libssh2_channel_get_exit_status(channel: number): number
+  libssh2_channel_get_exit_signal(channel: number, exitsignal: number, exitsignal_len: number, errmsg: number, errmsg_len: number, langtag: number, langtag_len: number): number
 
   libssh2_knownhost_init(session: number): number
   libssh2_knownhost_free(hosts: number): void
@@ -108,6 +113,11 @@ export function isLibssh2Exports(item: WebAssembly.Exports): item is Libssh2Expo
     "libssh2_channel_eof",
     "libssh2_channel_read_ex",
     "libssh2_channel_free",
+    "libssh2_channel_write_ex",
+    "libssh2_channel_flush_ex",
+    "libssh2_channel_wait_eof",
+    "libssh2_channel_get_exit_status",
+    "libssh2_channel_get_exit_signal",
 
     "libssh2_knownhost_init",
     "libssh2_knownhost_free",

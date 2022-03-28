@@ -81,7 +81,7 @@ export default class CEnv {
   }
 
   set(ptr: CPtr, content: Uint8Array) {
-    if (ptr.len === null || ptr.len !== content.byteLength) {
+    if (ptr.len === null || ptr.len < content.byteLength) {
       throw new Error();
     }
     new Uint8Array(this.#exports.memory.buffer, ptr.ptr, ptr.len).set(content);
@@ -111,6 +111,13 @@ export default class CEnv {
       throw new Error();
     }
     return new DataView(this.#exports.memory.buffer).getUint32(ptr.ptr, true);
+  }
+
+  buf(ptr: CPtr): Uint8Array {
+    if (ptr.len === null) {
+      throw new Error();
+    }
+    return new Uint8Array(this.#exports.memory.buffer, ptr.ptr, ptr.len);
   }
 
   ref(off: number, len: number | null): CPtr {

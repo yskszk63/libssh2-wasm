@@ -137,6 +137,10 @@ class Libssh2 {
       throw e;
     }
   }
+
+  close_fd(fd: number) {
+    this.#cenv.ccall(this.#exports.close, fd);
+  }
 }
 
 class Session {
@@ -186,7 +190,24 @@ class Session {
         this.#cenv.with([this.#cenv.malloc(4), this.#cenv.malloc(4)], ([ptr, len]) => {
           this.#exports.libssh2_session_last_error(this.#session, ptr.ptr, len.ptr, 0);
           const buf = this.#cenv.ref(this.#cenv.u32(ptr), this.#cenv.u32(len));
-          throw new Error(this.#cenv.str(buf));
+          throw new Error(`${ret}: ${this.#cenv.str(buf)}`);
+        });
+      }
+      await this.#poll();
+    }
+  }
+
+  async nbcallio<F extends (...args: any[]) => number>(fn: F, ...args: ArgumentTypes<F>): Promise<number> {
+    while (true) {
+      const ret = fn(...args);
+      if (ret >= 0) {
+        return ret;
+      }
+      if (ret !== -37/*LIBSSH2_ERROR_EAGAIN*/) {
+        this.#cenv.with([this.#cenv.malloc(4), this.#cenv.malloc(4)], ([ptr, len]) => {
+          this.#exports.libssh2_session_last_error(this.#session, ptr.ptr, len.ptr, 0);
+          const buf = this.#cenv.ref(this.#cenv.u32(ptr), this.#cenv.u32(len));
+          throw new Error(`${ret}: ${this.#cenv.str(buf)}`);
         });
       }
       await this.#poll();
@@ -274,6 +295,23 @@ class Session {
     return channel;
   }
 
+  async disconnect(description: string = "", lang: string = "C") {
+    await this.#cenv.with([description, lang], async ([description, lang]) => {
+      await this.nbcall(
+        this.#exports.libssh2_session_disconnect_ex,
+        this.#session,
+        11, //SSH_DISCONNECT_BY_APPLICATION
+        description.ptr,
+        lang.ptr,
+      );
+    });
+  }
+
+  close() {
+    this.#libssh2.close_fd(this.#fd);
+    this.#_fd = null;
+  }
+
   free() {
     this.#exports.libssh2_session_free(this.#session);
     this.#_session = null;
@@ -355,23 +393,83 @@ class SessionChannel {
     this.#_channel = channel;
 
     const it = this;
+    const stdoutbuf = it.#cenv.malloc(8 * 1024);
+    const stderrbuf = it.#cenv.malloc(8 * 1024);
+    const stdinbuf = it.#cenv.malloc(8 * 1024);
+
     this.#stdout = new libssh2.ReadableStream({
-      pull(controller) {
-        it.#exports.libssh2_channel_read_ex
+      async pull(controller) {
+        if (stdoutbuf.len === null) {
+          throw new Error();
+        }
+
+        const len = await it.#session.nbcallio(
+          it.#exports.libssh2_channel_read_ex,
+          it.#channel,
+          0,
+          stdoutbuf.ptr,
+          stdoutbuf.len,
+        );
+        if (len === 0) {
+          it.#cenv.free(stderrbuf);
+          return controller.close();
+        }
+        controller.enqueue(it.#cenv.buf(stdoutbuf).subarray(0, len));
       },
     });
 
     this.#stderr = new libssh2.ReadableStream({
-      pull(controller) {
-        it.#exports.libssh2_channel_read_ex
+      async pull(controller) {
+        if (stderrbuf.len === null) {
+          throw new Error();
+        }
+
+        const len = await it.#session.nbcallio(
+          it.#exports.libssh2_channel_read_ex,
+          it.#channel,
+          1, // SSH_EXTENDED_DATA_STDERR
+          stderrbuf.ptr,
+          stderrbuf.len,
+        );
+        if (len === 0) {
+          it.#cenv.free(stderrbuf);
+          return controller.close();
+        }
+        controller.enqueue(it.#cenv.buf(stderrbuf).subarray(0, len));
       },
     });
 
     this.#stdin = new libssh2.WritableStream({
-      write(chunk) {
+      async write(chunk) {
+        if (stdinbuf.len === null) {
+          throw new Error();
+        }
+
+        while (chunk.byteLength) {
+          const len = Math.min(chunk.byteLength, stdinbuf.len);
+          it.#cenv.set(stdinbuf, chunk.subarray(0, len));
+          chunk = chunk.subarray(len);
+
+          let remaining = len;
+          while (remaining) {
+            remaining -= await it.#session.nbcallio(
+              it.#exports.libssh2_channel_write_ex,
+              it.#channel,
+              0,
+              stdinbuf.ptr + (len - remaining),
+              remaining,
+            );
+          }
+        }
+        await it.#session.nbcall(
+          it.#exports.libssh2_channel_flush_ex,
+          it.#channel,
+          0,
+        );
       },
 
       async close(): Promise<void> {
+        it.#cenv.free(stdinbuf);
         await it.#session.nbcall(
           it.#exports.libssh2_channel_send_eof,
           it.#channel,
@@ -419,5 +517,29 @@ class SessionChannel {
         message.ptr, message.len - 1,
       );
     })
+  }
+
+  get status(): number {
+    // TODO exit?
+    return this.#exports.libssh2_channel_get_exit_status(this.#channel);
+  }
+
+  async waitEof(): Promise<void> {
+    await this.#session.nbcall(
+      this.#exports.libssh2_channel_wait_eof,
+      this.#channel,
+    );
+  }
+
+  async close() {
+    await this.#session.nbcall(
+      this.#exports.libssh2_channel_close,
+      this.#channel,
+    );
+  }
+
+  free() {
+    this.#exports.libssh2_channel_free(this.#channel);
+    this.#_channel = null;
   }
 }
