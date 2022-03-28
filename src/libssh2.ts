@@ -12,7 +12,7 @@ type NewLibssh2Opts = {
   WritableStream: typeof WritableStream
 }
 
-type ConnectOpts = {
+export type ConnectOpts = {
   host: string
   port?: number
   knownhosts: string[]
