@@ -4,7 +4,7 @@ export type WasiExports = {
 }
 
 export function isWasiExports(item: WebAssembly.Exports): item is WasiExports & WebAssembly.Exports {
-  if (!(item.memory instanceof WebAssembly.Memory)) {
+  if (!(item["memory"] instanceof WebAssembly.Memory)) {
     return false;
   }
 
@@ -31,7 +31,7 @@ export type CExports = {
 }
 
 export function isCExports(item: WebAssembly.Exports): item is CExports & WebAssembly.Exports {
-  if (!(item.errno instanceof WebAssembly.Global)) {
+  if (!(item["errno"] instanceof WebAssembly.Global)) {
     return false;
   }
 

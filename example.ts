@@ -1,7 +1,7 @@
 import fs from "fs/promises";
 import { ReadableStream, WritableStream } from "stream/web";
 
-import * as libssh2 from "./src/node";
+import * as libssh2 from "./src/node.js";
 
 const session = await libssh2.connect({
   host: "localhost",

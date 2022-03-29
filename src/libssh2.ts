@@ -1,6 +1,6 @@
-import Wasi from "./wasi";
-import * as sys from "./sys";
-import CEnv, { CPtr } from "./cenv";
+import Wasi from "./wasi.js";
+import * as sys from "./sys.js";
+import CEnv, { CPtr } from "./cenv.js";
 
 type ArgumentTypes<F extends Function> = F extends (...args: infer A) => number ? A : never;
 
@@ -102,7 +102,7 @@ class Libssh2 {
   }
 
   async connect({ host, port=22, knownhosts, username, privatekey }: ConnectOpts): Promise<Session> {
-    const fd = this.#cenv.with([`/dev/tcp/${host}:${port}`], ([path]) => {
+    const fd = this.#cenv.with([`/dev/tcp/${host}:${port}`], (path) => {
       // TODO flags
       return this.#cenv.ccall(this.#exports.open, path.ptr, 0x0400_0000);
     });
@@ -187,7 +187,7 @@ class Session {
         return ret;
       }
       if (ret !== -37/*LIBSSH2_ERROR_EAGAIN*/) {
-        this.#cenv.with([this.#cenv.malloc(4), this.#cenv.malloc(4)], ([ptr, len]) => {
+        this.#cenv.with([this.#cenv.malloc(4), this.#cenv.malloc(4)], (ptr, len) => {
           this.#exports.libssh2_session_last_error(this.#session, ptr.ptr, len.ptr, 0);
           const buf = this.#cenv.ref(this.#cenv.u32(ptr), this.#cenv.u32(len));
           throw new Error(`${ret}: ${this.#cenv.str(buf)}`);
@@ -204,7 +204,7 @@ class Session {
         return ret;
       }
       if (ret !== -37/*LIBSSH2_ERROR_EAGAIN*/) {
-        this.#cenv.with([this.#cenv.malloc(4), this.#cenv.malloc(4)], ([ptr, len]) => {
+        this.#cenv.with([this.#cenv.malloc(4), this.#cenv.malloc(4)], (ptr, len) => {
           this.#exports.libssh2_session_last_error(this.#session, ptr.ptr, len.ptr, 0);
           const buf = this.#cenv.ref(this.#cenv.u32(ptr), this.#cenv.u32(len));
           throw new Error(`${ret}: ${this.#cenv.str(buf)}`);
@@ -224,7 +224,7 @@ class Session {
 
   async handshake(): Promise<CPtr> {
     await this.nbcall(this.#exports.libssh2_session_handshake, this.#session, this.#fd);
-    return this.#cenv.with([this.#cenv.malloc(4)], ([len]) => {
+    return this.#cenv.with([this.#cenv.malloc(4)], (len) => {
       const r = this.#exports.libssh2_session_hostkey(this.#session, len.ptr, 0);
       if (r === 0) {
         throw new Error("failed to get hostkey");
@@ -241,7 +241,7 @@ class Session {
     const it = this;
 
     const key = await privatekey();
-    return this.#cenv.with([username, this.#cenv.copy(key)], async ([username, key]) => {
+    return this.#cenv.with([username, this.#cenv.copy(key)], async (username, key) => {
       if (username.len === null || key.len === null) {
         throw new Error();
       }
@@ -260,7 +260,7 @@ class Session {
 
   async newChannel(type: "session"): Promise<SessionChannel> {
     const it = this;
-    return this.#cenv.with([type], async ([channeltype]) => {
+    return this.#cenv.with([type], async (channeltype) => {
       if (channeltype.len === null) {
         throw new Error();
       }
@@ -278,7 +278,7 @@ class Session {
           return new SessionChannel(this.#libssh2, this, ret);
         }
         if (it.#exports.libssh2_session_last_errno(it.#session) !== -37/*LIBSSH2_ERROR_EAGAIN*/) {
-          it.#cenv.with([it.#cenv.malloc(4), it.#cenv.malloc(4)], ([ptr, len]) => {
+          it.#cenv.with([it.#cenv.malloc(4), it.#cenv.malloc(4)], (ptr, len) => {
             it.#exports.libssh2_session_last_error(it.#session, ptr.ptr, len.ptr, 0);
             const buf = it.#cenv.ref(it.#cenv.u32(ptr), it.#cenv.u32(len));
             throw new Error(it.#cenv.str(buf));
@@ -296,7 +296,7 @@ class Session {
   }
 
   async disconnect(description: string = "", lang: string = "C") {
-    await this.#cenv.with([description, lang], async ([description, lang]) => {
+    await this.#cenv.with([description, lang], async (description, lang) => {
       await this.nbcall(
         this.#exports.libssh2_session_disconnect_ex,
         this.#session,
@@ -343,7 +343,7 @@ class Knownhost {
   }
 
   readline(line: string) {
-    this.#cenv.with([line], ([line]) => {
+    this.#cenv.with([line], (line) => {
       const r = this.#exports.libssh2_knownhost_readline(this.#hosts, line.ptr, line.len ?? 0, 1/*LIBSSH2_KNOWNHOST_FILE_OPENSSH*/);
       if (r) {
         throw new Error();
@@ -352,7 +352,7 @@ class Knownhost {
   }
 
   checkp(host: string, port: number, key: CPtr) {
-    this.#cenv.with([host], ([host]) => {
+    this.#cenv.with([host], (host) => {
       const typemask =
         1 /*LIBSSH2_KNOWNHOST_TYPE_PLAIN*/
       | (1<<16)/*LIBSSH2_KNOWNHOST_KEYENC_RAW*/
@@ -506,7 +506,7 @@ class SessionChannel {
   }
 
   async processStartup(request: string, message: string): Promise<void> {
-    await this.#cenv.with([request, message], async ([request, message]) => {
+    await this.#cenv.with([request, message], async (request, message) => {
       if (request.len === null || message.len === null) {
         throw new Error();
       }

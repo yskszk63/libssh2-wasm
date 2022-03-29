@@ -440,10 +440,11 @@ export default class Wasi {
   }
 
   fd_fdstat_get(fd: number, result: number): number {
-    if (!(fd in this.#fds)) {
+    const fdi = this.#fds[fd];
+    if (typeof fdi === "undefined") {
       return EBADF;
     }
-    const stat = this.#fds[fd].stat;
+    const stat = fdi.stat;
 
     const view = new DataView(this.#memory);
     view.setUint8(result + 0, stat.fs_filetype);

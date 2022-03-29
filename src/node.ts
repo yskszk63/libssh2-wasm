@@ -3,14 +3,14 @@ import fs from "fs/promises";
 import { ReadableStream, WritableStream } from "stream/web";
 import { webcrypto } from "crypto";
 
-import { newLibssh2 } from "./libssh2";
+import { newLibssh2 } from "./libssh2.js";
 import type {
   ConnectOpts,
-} from "./libssh2";
+} from "./libssh2.js";
 
 export type {
   ConnectOpts,
-} from "./libssh2";
+} from "./libssh2.js";
 
 const libssh2 = await newLibssh2({
   async fetcher() {
