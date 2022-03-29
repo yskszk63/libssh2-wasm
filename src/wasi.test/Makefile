@@ -5,7 +5,7 @@ CC = $(WASI_SDK_ROOT)/bin/clang
 all: libtest.wasm check
 
 libtest.wasm: lib.c
-	$(CC) -nostartfiles -Wl,--no-entry -Wl,--export-all -o $@ $<
+	$(CC) -mexec-model=reactor -Wl,--export-all -o $@ $<
 
 check.wasm: check.c
 	$(CC) -o $@ $^

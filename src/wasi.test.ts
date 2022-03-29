@@ -1,8 +1,10 @@
 import { spawn } from "child_process";
 import { fileURLToPath } from "url";
 import { readFile } from "fs/promises";
+//import { ReadableStream, WritableStream } from "stream/web";
+import { webcrypto } from "crypto";
 
-import Wasi, * as w from "./wasi";
+import Wasi from "./wasi";
 
 let mod: WebAssembly.Module | undefined;
 
@@ -24,12 +26,32 @@ beforeAll(async () => {
   mod = await WebAssembly.compile(bin);
 });
 
+/*
+function newUint8ArrayReadableStream(buf: Uint8Array): ReadableStream<Uint8Array> {
+  buf = buf.slice();
+
+  return new ReadableStream({
+  });
+}
+
+function newUint8ArrayWritableStream(buf: Uint8Array): WritableStream<Uint8Array> {
+  buf = buf.slice();
+
+  return new WritableStream({
+  });
+}
+*/
+
 test("clock_time_get", async () => {
   if (!mod) {
     throw new Error();
   }
 
-  const wasi = new Wasi();
+  const wasi = new Wasi({
+    netFactory: () => Promise.reject("stub"),
+    crypto: webcrypto as unknown as Crypto,
+  });
+
   const instance = await WebAssembly.instantiate(mod, {
     wasi_snapshot_preview1: wasi.exports,
   });
@@ -71,13 +93,16 @@ test("fd_fdstat_get", async () => {
     throw new Error();
   }
 
-  const wasi = new Wasi();
+  const wasi = new Wasi({
+    netFactory: () => Promise.reject("stub"),
+    crypto: webcrypto as unknown as Crypto,
+  });
   const instance = await WebAssembly.instantiate(mod, {
     wasi_snapshot_preview1: wasi.exports,
   });
   wasi.initialize(instance);
 
-  const { fcntl, memory, malloc, free } = instance.exports;
+  const { fcntl, memory, malloc, free, open, close } = instance.exports;
   if (typeof fcntl !== "function") {
     throw new Error();
   }
@@ -85,6 +110,12 @@ test("fd_fdstat_get", async () => {
     throw new Error();
   }
   if (typeof free !== "function") {
+    throw new Error();
+  }
+  if (typeof open !== "function") {
+    throw new Error();
+  }
+  if (typeof close !== "function") {
     throw new Error();
   }
   if (!(memory instanceof WebAssembly.Memory)) {
@@ -96,13 +127,16 @@ test("fd_fdstat_get", async () => {
     expect(r).toBe(-1);
   }
 
-  const fd = wasi.addFd({
-    filetype: w.FILETYPE_REGULAR,
-    flags: [w.FDFLAGS_NONBLOCK],
-    rights: [w.RIGHT_FD_READ],
-  });
+  const fname = new TextEncoder().encode("/dev/urandom\0");
+  const pfname = malloc(fname.byteLength);
+  if (!pfname) {
+    throw new Error();
+  }
+  new Uint8Array(memory.buffer, pfname, fname.byteLength).set(fname);
+  const fd = open(pfname, 0x0400_0000);
   const r = fcntl(fd, 3/*F_GETFL*/);
-  expect(r).toBe(0x4000000 | 0x4 /*O_RDONLY | O_NONBLOCK*/);
+  expect(r).toBe(0x0400_0000 /*O_RDONLY*/);
+  close(fd);
 });
 
 test("poll_oneoff", async () => {
@@ -110,7 +144,10 @@ test("poll_oneoff", async () => {
     throw new Error();
   }
 
-  const wasi = new Wasi();
+  const wasi = new Wasi({
+    netFactory: () => Promise.reject("stub"),
+    crypto: webcrypto as unknown as Crypto,
+  });
   const instance = await WebAssembly.instantiate(mod, {
     wasi_snapshot_preview1: wasi.exports,
   });
@@ -129,12 +166,6 @@ test("poll_oneoff", async () => {
   if (!(memory instanceof WebAssembly.Memory)) {
     throw new Error();
   }
-
-  const fd = wasi.addFd({
-    filetype: w.FILETYPE_REGULAR,
-    flags: [w.FDFLAGS_NONBLOCK],
-    rights: [w.RIGHT_FD_READ],
-  });
 
   const r = poll(null, 0, -1);
   expect(r).toBe(0);

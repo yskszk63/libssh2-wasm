@@ -5,8 +5,7 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "test": "NODE_OPTIONS='--experimental-vm-modules' jest",
-    "esmo": "esmo --enable-source-maps"
+    "test": "NODE_OPTIONS='--experimental-vm-modules' jest"
   },
   "author": "",
   "license": "MIT",
