@@ -3,6 +3,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <poll.h>
 
 void assert(int cond, char* msg) {
     if (!cond) {
@@ -22,5 +23,9 @@ int main() {
 
     assert(sizeof(char**) == 4, "err char**");
     assert(sizeof(int*) == 4, "err int*");
+
+    assert(sizeof(struct pollfd) == 8, "err pollfd");
+    assert(POLLIN == 0x001, "err POLLIN");
+    assert(POLLOUT == 0x002, "err POLLOUT");
     return 0;
 }

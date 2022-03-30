@@ -6,6 +6,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <poll.h>
+#include <sys/types.h>
+#include <sys/socket.h>
 
 void dummy() {
     void *r = malloc(0);
@@ -20,4 +23,8 @@ void dummy() {
 
     open("", 0);
     close(0);
+
+    poll(NULL, 0, -1);
+
+    recv(0, NULL, 0, 0);
 }

@@ -1,7 +1,7 @@
 import { spawn } from "child_process";
 import { fileURLToPath } from "url";
 import { readFile } from "fs/promises";
-//import { ReadableStream, WritableStream } from "stream/web";
+import { ReadableStream, WritableStream } from "stream/web";
 import { webcrypto } from "crypto";
 
 import Wasi from "./wasi";
@@ -26,11 +26,18 @@ beforeAll(async () => {
   mod = await WebAssembly.compile(bin);
 });
 
-/*
 function newUint8ArrayReadableStream(buf: Uint8Array): ReadableStream<Uint8Array> {
   buf = buf.slice();
 
   return new ReadableStream({
+    pull(controller) {
+      if (!buf.byteLength) {
+        return controller.close();
+      }
+      controller.enqueue(buf);
+      buf = buf.slice(buf.byteLength);
+    },
+    type: "bytes",
   });
 }
 
@@ -40,7 +47,6 @@ function newUint8ArrayWritableStream(buf: Uint8Array): WritableStream<Uint8Array
   return new WritableStream({
   });
 }
-*/
 
 test("clock_time_get", async () => {
   if (!mod) {
@@ -144,8 +150,14 @@ test("poll_oneoff", async () => {
     throw new Error();
   }
 
+  const reader = newUint8ArrayReadableStream(new Uint8Array());
+  const writer = newUint8ArrayWritableStream(new Uint8Array());
   const wasi = new Wasi({
-    netFactory: () => Promise.reject("stub"),
+    netFactory: async (host, port) => {
+      expect(host).toStrictEqual("dummy");
+      expect(port).toStrictEqual(0);
+      return [reader, writer];
+    },
     crypto: webcrypto as unknown as Crypto,
   });
   const instance = await WebAssembly.instantiate(mod, {
@@ -153,7 +165,7 @@ test("poll_oneoff", async () => {
   });
   wasi.initialize(instance);
 
-  const { poll, memory, malloc, free } = instance.exports;
+  const { poll, memory, malloc, free, open, recv } = instance.exports;
   if (typeof poll !== "function") {
     throw new Error();
   }
@@ -163,10 +175,48 @@ test("poll_oneoff", async () => {
   if (typeof free !== "function") {
     throw new Error();
   }
+  if (typeof open !== "function") {
+    throw new Error();
+  }
+  if (typeof recv !== "function") {
+    throw new Error();
+  }
   if (!(memory instanceof WebAssembly.Memory)) {
     throw new Error();
   }
 
-  const r = poll(null, 0, -1);
-  expect(r).toBe(0);
+  const path = new TextEncoder().encode("/dev/tcp/dummy:0");
+  const ppath = malloc(path.byteLength);
+  new Uint8Array(memory.buffer, ppath, path.byteLength).set(path);
+  const fd = open(ppath, 0x0400_0000);
+  if (fd < 0) {
+    throw new Error(`err ${fd}`);
+  }
+  const fds = malloc(8);
+  ((v: DataView) => {
+    v.setInt32(0, fd, true); // fd
+    v.setInt16(4, 0x001 | 0x002, true); // events POLLIN | POLLOUT
+    v.setInt16(6, 0, true); // revents
+  })(new DataView(memory.buffer, fds, 8));
+  {
+    const r = poll(fds, 1, -1);
+    expect(r).toBe(0);
+  }
+
+  await wasi.poll([fd]);
+  {
+    const r = poll(fds, 1, -1);
+    expect(r).toBe(1);
+  }
+
+  const buf = malloc(1);
+  if (!buf) {
+    throw new Error();
+  }
+
+  {
+    expect(recv(fd, buf, 1, 0)).toBe(-1);
+    await wasi.poll([fd]);
+    expect(recv(fd, buf, 1, 0)).toBe(-1);
+  }
 });

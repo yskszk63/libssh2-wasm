@@ -1,4 +1,4 @@
-import type { CExports, WasiExports } from "./sys";
+import type { CExports, WasiExports } from "./sys.js";
 
 export class CPtr {
   #env: CEnv

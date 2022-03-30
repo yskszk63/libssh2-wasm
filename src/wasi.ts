@@ -533,7 +533,7 @@ export default class Wasi {
         if (!host || !port) {
           return EBADF;
         }
-        if (!Number(port)) {
+        if (!Number.isFinite(Number(port))) {
           return EBADF;
         }
 
@@ -618,9 +618,10 @@ export default class Wasi {
             state: "reading",
             reader,
           }
-          fdi.sig[0] = 0;
+          Atomics.store(fdi.sig, 0, 0);
+          Atomics.notify(fdi.sig, 0);
           reader.read(new Uint8Array(buf.buffer)).then(({ value, done }) => {
-            fdi.sig[0] = 1;
+            Atomics.store(fdi.sig, 0, 1);
             Atomics.notify(fdi.sig, 0);
 
             if (done) {
@@ -635,7 +636,7 @@ export default class Wasi {
               buf: value,
               reader,
             }
-          }); // TODO catch
+          }).catch(console.error); // TODO catch
           return EAGAIN;
         }
 
