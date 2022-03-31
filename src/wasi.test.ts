@@ -30,12 +30,17 @@ function newUint8ArrayReadableStream(buf: Uint8Array): ReadableStream<Uint8Array
   buf = buf.slice();
 
   return new ReadableStream({
-    pull(controller) {
+    start(controller) {
       if (!buf.byteLength) {
         return controller.close();
       }
+    },
+    pull(controller) {
       controller.enqueue(buf);
       buf = buf.slice(buf.byteLength);
+      if (!buf.byteLength) {
+        return controller.close();
+      }
     },
     type: "bytes",
   });
@@ -205,6 +210,7 @@ test("poll_oneoff", async () => {
 
   await wasi.poll([fd]);
   {
+    // idle
     const r = poll(fds, 1, -1);
     expect(r).toBe(1);
   }
@@ -217,6 +223,14 @@ test("poll_oneoff", async () => {
   {
     expect(recv(fd, buf, 1, 0)).toBe(-1);
     await wasi.poll([fd]);
-    expect(recv(fd, buf, 1, 0)).toBe(-1);
+    expect(recv(fd, buf, 1, 0)).toBe(0);
   }
+
+  await wasi.poll([fd]);
+  {
+    // eof
+    const r = poll(fds, 1, -1);
+    expect(r).toBe(1);
+  }
+
 });
