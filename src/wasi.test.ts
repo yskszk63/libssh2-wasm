@@ -4,7 +4,7 @@ import { readFile } from "fs/promises";
 import { ReadableStream, WritableStream } from "stream/web";
 import { webcrypto } from "crypto";
 
-import Wasi from "./wasi";
+import Wasi from "./wasi.js";
 
 let mod: WebAssembly.Module | undefined;
 
@@ -52,6 +52,86 @@ function newUint8ArrayWritableStream(buf: Uint8Array): WritableStream<Uint8Array
   return new WritableStream({
   });
 }
+
+test("test initialize", async () => {
+  if (!mod) {
+    throw new Error();
+  }
+
+  const wasi = new Wasi({
+    netFactory: () => Promise.reject("stub"),
+    crypto: webcrypto as unknown as Crypto,
+  });
+  const instance = await WebAssembly.instantiate(mod, {
+    wasi_snapshot_preview1: wasi.exports,
+  });
+  wasi.initialize(instance);
+});
+
+test("test initialize no mem", async () => {
+  const mod = await WebAssembly.compile(new Uint8Array([
+    // https://developer.mozilla.org/en-US/docs/WebAssembly/Understanding_the_text_format#the_simplest_module
+    0x00, 0x61, 0x73, 0x6d, // WASM_BINARY_MAGIC
+    0x01, 0x00, 0x00, 0x00, // WASM_BINARY_VERSION
+  ]));
+
+  const wasi = new Wasi({
+    netFactory: () => Promise.reject("stub"),
+    crypto: webcrypto as unknown as Crypto,
+  });
+  const instance = await WebAssembly.instantiate(mod, {
+    wasi_snapshot_preview1: wasi.exports,
+  });
+  expect(() => wasi.initialize(instance)).toThrow("!undefined instanceof WebAssembly.Memory");
+});
+
+test("test initialize no _init", async () => {
+  /*
+   * (module
+   *  (memory $0 1)
+   *  (export "memory" (memory $0))
+   * )
+   */
+  const mod = await WebAssembly.compile(new Uint8Array([
+    0x00, 0x61, 0x73, 0x6d, // WASM_BINARY_MAGIC
+    0x01, 0x00, 0x00, 0x00, // WASM_BINARY_VERSION
+    0x05, 0x83, 0x80, 0x80,
+    0x80, 0x00, 0x01, 0x00,
+    0x01, 0x06, 0x81, 0x80,
+    0x80, 0x80, 0x00, 0x00,
+    0x07, 0x8a, 0x80, 0x80,
+    0x80, 0x00, 0x01, 0x06,
+    0x6d, 0x65, 0x6d, 0x6f,
+    0x72, 0x79, 0x02, 0x00,
+  ]));
+
+  const wasi = new Wasi({
+    netFactory: () => Promise.reject("stub"),
+    crypto: webcrypto as unknown as Crypto,
+  });
+  const instance = await WebAssembly.instantiate(mod, {
+    wasi_snapshot_preview1: wasi.exports,
+  });
+  expect(() => wasi.initialize(instance)).toThrow("no _initialize found.");
+});
+
+test("invalid poll fd.", async () => {
+  if (!mod) {
+    throw new Error();
+  }
+
+  const wasi = new Wasi({
+    netFactory: () => Promise.reject("stub"),
+    crypto: webcrypto as unknown as Crypto,
+  });
+
+  const instance = await WebAssembly.instantiate(mod, {
+    wasi_snapshot_preview1: wasi.exports,
+  });
+  wasi.initialize(instance);
+
+  await expect(wasi.poll([-1])).rejects.toThrow("invalid fd.");
+});
 
 test("clock_time_get", async () => {
   if (!mod) {
@@ -148,6 +228,598 @@ test("fd_fdstat_get", async () => {
   const r = fcntl(fd, 3/*F_GETFL*/);
   expect(r).toBe(0x0400_0000 /*O_RDONLY*/);
   close(fd);
+});
+
+test("fd_filestat_get", async () => {
+  if (!mod) {
+    throw new Error();
+  }
+
+  const wasi = new Wasi({
+    netFactory: () => Promise.reject("stub"),
+    crypto: webcrypto as unknown as Crypto,
+  });
+  const instance = await WebAssembly.instantiate(mod, {
+    wasi_snapshot_preview1: wasi.exports,
+  });
+  wasi.initialize(instance);
+
+  const { fcntl, memory, malloc, free, open, close, fstat } = instance.exports;
+  if (typeof fcntl !== "function") {
+    throw new Error();
+  }
+  if (typeof malloc !== "function") {
+    throw new Error();
+  }
+  if (typeof free !== "function") {
+    throw new Error();
+  }
+  if (typeof open !== "function") {
+    throw new Error();
+  }
+  if (typeof close !== "function") {
+    throw new Error();
+  }
+  if (typeof fstat !== "function") {
+    throw new Error();
+  }
+  if (!(memory instanceof WebAssembly.Memory)) {
+    throw new Error();
+  }
+
+  const fname = new TextEncoder().encode("/dev/urandom\0");
+  const pfname = malloc(fname.byteLength);
+  if (!pfname) {
+    throw new Error();
+  }
+  new Uint8Array(memory.buffer, pfname, fname.byteLength).set(fname);
+  const fd = open(pfname, 0x0400_0000);
+  const stat = malloc(144);
+  const r = fstat(fd, stat);
+  expect(r).toBe(0);
+  close(fd);
+});
+
+test("fd_filestat_get fail", async () => {
+  if (!mod) {
+    throw new Error();
+  }
+
+  const wasi = new Wasi({
+    netFactory: () => Promise.reject("stub"),
+    crypto: webcrypto as unknown as Crypto,
+  });
+  const instance = await WebAssembly.instantiate(mod, {
+    wasi_snapshot_preview1: wasi.exports,
+  });
+  wasi.initialize(instance);
+
+  const { fcntl, memory, malloc, free, open, close, fstat } = instance.exports;
+  if (typeof fcntl !== "function") {
+    throw new Error();
+  }
+  if (typeof malloc !== "function") {
+    throw new Error();
+  }
+  if (typeof free !== "function") {
+    throw new Error();
+  }
+  if (typeof open !== "function") {
+    throw new Error();
+  }
+  if (typeof close !== "function") {
+    throw new Error();
+  }
+  if (typeof fstat !== "function") {
+    throw new Error();
+  }
+  if (!(memory instanceof WebAssembly.Memory)) {
+    throw new Error();
+  }
+
+  const r = fstat(-1, 0);
+  expect(r).toBe(-1);
+});
+
+test("fd_read", async () => {
+  if (!mod) {
+    throw new Error();
+  }
+
+  const wasi = new Wasi({
+    netFactory: () => Promise.reject("stub"),
+    crypto: webcrypto as unknown as Crypto,
+  });
+  const instance = await WebAssembly.instantiate(mod, {
+    wasi_snapshot_preview1: wasi.exports,
+  });
+  wasi.initialize(instance);
+
+  const { fcntl, memory, malloc, free, open, close, read } = instance.exports;
+  if (typeof fcntl !== "function") {
+    throw new Error();
+  }
+  if (typeof malloc !== "function") {
+    throw new Error();
+  }
+  if (typeof free !== "function") {
+    throw new Error();
+  }
+  if (typeof open !== "function") {
+    throw new Error();
+  }
+  if (typeof close !== "function") {
+    throw new Error();
+  }
+  if (typeof read !== "function") {
+    throw new Error();
+  }
+  if (!(memory instanceof WebAssembly.Memory)) {
+    throw new Error();
+  }
+
+  const fname = new TextEncoder().encode("/dev/urandom\0");
+  const pfname = malloc(fname.byteLength);
+  if (!pfname) {
+    throw new Error();
+  }
+  new Uint8Array(memory.buffer, pfname, fname.byteLength).set(fname);
+  const fd = open(pfname, 0x0400_0000);
+  const buf = malloc(8 * 1024);
+  for (const b of new Uint8Array(memory.buffer, buf, 8 * 1024)) {
+    expect(b).toBe(0);
+  }
+  const r = read(fd, buf, 8 * 1024);
+  expect(new Uint8Array(memory.buffer, buf, 8 * 1024).every(v => v === 0)).toBe(false);
+  expect(r).toBe(8 * 1024);
+  close(fd);
+});
+
+test("path_open", async () => {
+  if (!mod) {
+    throw new Error();
+  }
+
+  const wasi = new Wasi({
+    netFactory: () => Promise.reject("stub"),
+    crypto: webcrypto as unknown as Crypto,
+  });
+  const instance = await WebAssembly.instantiate(mod, {
+    wasi_snapshot_preview1: wasi.exports,
+  });
+  wasi.initialize(instance);
+
+  const { fcntl, memory, malloc, free, open, close, read } = instance.exports;
+  if (typeof fcntl !== "function") {
+    throw new Error();
+  }
+  if (typeof malloc !== "function") {
+    throw new Error();
+  }
+  if (typeof free !== "function") {
+    throw new Error();
+  }
+  if (typeof open !== "function") {
+    throw new Error();
+  }
+  if (typeof close !== "function") {
+    throw new Error();
+  }
+  if (typeof read !== "function") {
+    throw new Error();
+  }
+  if (!(memory instanceof WebAssembly.Memory)) {
+    throw new Error();
+  }
+
+  const fname = new TextEncoder().encode("/dev/urandom\0");
+  const pfname = malloc(fname.byteLength);
+  if (!pfname) {
+    throw new Error();
+  }
+  new Uint8Array(memory.buffer, pfname, fname.byteLength).set(fname);
+  const fd = open(pfname, 0x0400_0000);
+  expect(fd).not.toBe(-1);
+  close(fd);
+});
+
+test("path_open fail", async () => {
+  if (!mod) {
+    throw new Error();
+  }
+
+  const wasi = new Wasi({
+    netFactory: () => Promise.reject("stub"),
+    crypto: webcrypto as unknown as Crypto,
+  });
+  const instance = await WebAssembly.instantiate(mod, {
+    wasi_snapshot_preview1: wasi.exports,
+  });
+  wasi.initialize(instance);
+
+  const { fcntl, memory, malloc, free, open, close, read } = instance.exports;
+  if (typeof fcntl !== "function") {
+    throw new Error();
+  }
+  if (typeof malloc !== "function") {
+    throw new Error();
+  }
+  if (typeof free !== "function") {
+    throw new Error();
+  }
+  if (typeof open !== "function") {
+    throw new Error();
+  }
+  if (typeof close !== "function") {
+    throw new Error();
+  }
+  if (typeof read !== "function") {
+    throw new Error();
+  }
+  if (!(memory instanceof WebAssembly.Memory)) {
+    throw new Error();
+  }
+
+  const fname = new TextEncoder().encode("/dev/cpuinfo\0");
+  const pfname = malloc(fname.byteLength);
+  if (!pfname) {
+    throw new Error();
+  }
+  new Uint8Array(memory.buffer, pfname, fname.byteLength).set(fname);
+  const fd = open(pfname, 0x0400_0000);
+  expect(fd).toBe(-1);
+  close(fd);
+});
+
+test("path_open invalid tcp name", async () => {
+  if (!mod) {
+    throw new Error();
+  }
+
+  const wasi = new Wasi({
+    netFactory: () => Promise.reject("stub"),
+    crypto: webcrypto as unknown as Crypto,
+  });
+  const instance = await WebAssembly.instantiate(mod, {
+    wasi_snapshot_preview1: wasi.exports,
+  });
+  wasi.initialize(instance);
+
+  const { fcntl, memory, malloc, free, open, close, read } = instance.exports;
+  if (typeof fcntl !== "function") {
+    throw new Error();
+  }
+  if (typeof malloc !== "function") {
+    throw new Error();
+  }
+  if (typeof free !== "function") {
+    throw new Error();
+  }
+  if (typeof open !== "function") {
+    throw new Error();
+  }
+  if (typeof close !== "function") {
+    throw new Error();
+  }
+  if (typeof read !== "function") {
+    throw new Error();
+  }
+  if (!(memory instanceof WebAssembly.Memory)) {
+    throw new Error();
+  }
+
+  const fname = new TextEncoder().encode("/dev/tcp/x\0");
+  const pfname = malloc(fname.byteLength);
+  if (!pfname) {
+    throw new Error();
+  }
+  new Uint8Array(memory.buffer, pfname, fname.byteLength).set(fname);
+  const fd = open(pfname, 0x0400_0000);
+  expect(fd).toBe(-1);
+  close(fd);
+});
+
+test("path_open invalid tcp name2", async () => {
+  if (!mod) {
+    throw new Error();
+  }
+
+  const wasi = new Wasi({
+    netFactory: () => Promise.reject("stub"),
+    crypto: webcrypto as unknown as Crypto,
+  });
+  const instance = await WebAssembly.instantiate(mod, {
+    wasi_snapshot_preview1: wasi.exports,
+  });
+  wasi.initialize(instance);
+
+  const { fcntl, memory, malloc, free, open, close, read } = instance.exports;
+  if (typeof fcntl !== "function") {
+    throw new Error();
+  }
+  if (typeof malloc !== "function") {
+    throw new Error();
+  }
+  if (typeof free !== "function") {
+    throw new Error();
+  }
+  if (typeof open !== "function") {
+    throw new Error();
+  }
+  if (typeof close !== "function") {
+    throw new Error();
+  }
+  if (typeof read !== "function") {
+    throw new Error();
+  }
+  if (!(memory instanceof WebAssembly.Memory)) {
+    throw new Error();
+  }
+
+  const fname = new TextEncoder().encode("/dev/tcp/x:x\0");
+  const pfname = malloc(fname.byteLength);
+  if (!pfname) {
+    throw new Error();
+  }
+  new Uint8Array(memory.buffer, pfname, fname.byteLength).set(fname);
+  const fd = open(pfname, 0x0400_0000);
+  expect(fd).toBe(-1);
+  close(fd);
+});
+
+test("fd_read fail", async () => {
+  if (!mod) {
+    throw new Error();
+  }
+
+  const wasi = new Wasi({
+    netFactory: () => Promise.reject("stub"),
+    crypto: webcrypto as unknown as Crypto,
+  });
+  const instance = await WebAssembly.instantiate(mod, {
+    wasi_snapshot_preview1: wasi.exports,
+  });
+  wasi.initialize(instance);
+
+  const { fcntl, memory, malloc, free, open, close, read } = instance.exports;
+  if (typeof fcntl !== "function") {
+    throw new Error();
+  }
+  if (typeof malloc !== "function") {
+    throw new Error();
+  }
+  if (typeof free !== "function") {
+    throw new Error();
+  }
+  if (typeof open !== "function") {
+    throw new Error();
+  }
+  if (typeof close !== "function") {
+    throw new Error();
+  }
+  if (typeof read !== "function") {
+    throw new Error();
+  }
+  if (!(memory instanceof WebAssembly.Memory)) {
+    throw new Error();
+  }
+
+  const r = read(-1, 0, 0);
+  expect(r).toBe(-1);
+});
+
+test("fd_close urandom", async () => {
+  if (!mod) {
+    throw new Error();
+  }
+
+  const wasi = new Wasi({
+    netFactory: () => Promise.reject("stub"),
+    crypto: webcrypto as unknown as Crypto,
+  });
+  const instance = await WebAssembly.instantiate(mod, {
+    wasi_snapshot_preview1: wasi.exports,
+  });
+  wasi.initialize(instance);
+
+  const { fcntl, memory, malloc, free, open, close, read } = instance.exports;
+  if (typeof fcntl !== "function") {
+    throw new Error();
+  }
+  if (typeof malloc !== "function") {
+    throw new Error();
+  }
+  if (typeof free !== "function") {
+    throw new Error();
+  }
+  if (typeof open !== "function") {
+    throw new Error();
+  }
+  if (typeof close !== "function") {
+    throw new Error();
+  }
+  if (typeof read !== "function") {
+    throw new Error();
+  }
+  if (!(memory instanceof WebAssembly.Memory)) {
+    throw new Error();
+  }
+
+  const fname = new TextEncoder().encode("/dev/urandom\0");
+  const pfname = malloc(fname.byteLength);
+  if (!pfname) {
+    throw new Error();
+  }
+  new Uint8Array(memory.buffer, pfname, fname.byteLength).set(fname);
+  const fd = open(pfname, 0x0400_0000);
+  expect(fd).not.toBe(-1);
+  const r = close(fd);
+  expect(r).not.toBe(-1);
+});
+
+test("fd_close sock connecting", async () => {
+  if (!mod) {
+    throw new Error();
+  }
+
+  const rs = newUint8ArrayReadableStream(new Uint8Array());
+  const ws = newUint8ArrayWritableStream(new Uint8Array());
+  const wasi = new Wasi({
+    netFactory: () => Promise.resolve([rs, ws]),
+    crypto: webcrypto as unknown as Crypto,
+  });
+  const instance = await WebAssembly.instantiate(mod, {
+    wasi_snapshot_preview1: wasi.exports,
+  });
+  wasi.initialize(instance);
+
+  const { fcntl, memory, malloc, free, open, close, read } = instance.exports;
+  if (typeof fcntl !== "function") {
+    throw new Error();
+  }
+  if (typeof malloc !== "function") {
+    throw new Error();
+  }
+  if (typeof free !== "function") {
+    throw new Error();
+  }
+  if (typeof open !== "function") {
+    throw new Error();
+  }
+  if (typeof close !== "function") {
+    throw new Error();
+  }
+  if (typeof read !== "function") {
+    throw new Error();
+  }
+  if (!(memory instanceof WebAssembly.Memory)) {
+    throw new Error();
+  }
+
+  const fname = new TextEncoder().encode("/dev/tcp/x:0\0");
+  const pfname = malloc(fname.byteLength);
+  if (!pfname) {
+    throw new Error();
+  }
+  new Uint8Array(memory.buffer, pfname, fname.byteLength).set(fname);
+  const fd = open(pfname, 0x0400_0000);
+  expect(fd).not.toBe(-1);
+  const r = close(fd);
+  expect(r).not.toBe(-1);
+});
+
+test("fd_close sock idle", async () => {
+  if (!mod) {
+    throw new Error();
+  }
+
+  const rs = newUint8ArrayReadableStream(new Uint8Array());
+  const ws = newUint8ArrayWritableStream(new Uint8Array());
+  const wasi = new Wasi({
+    netFactory: () => Promise.resolve([rs, ws]),
+    crypto: webcrypto as unknown as Crypto,
+  });
+  const instance = await WebAssembly.instantiate(mod, {
+    wasi_snapshot_preview1: wasi.exports,
+  });
+  wasi.initialize(instance);
+
+  const { fcntl, memory, malloc, free, open, close, read } = instance.exports;
+  if (typeof fcntl !== "function") {
+    throw new Error();
+  }
+  if (typeof malloc !== "function") {
+    throw new Error();
+  }
+  if (typeof free !== "function") {
+    throw new Error();
+  }
+  if (typeof open !== "function") {
+    throw new Error();
+  }
+  if (typeof close !== "function") {
+    throw new Error();
+  }
+  if (typeof read !== "function") {
+    throw new Error();
+  }
+  if (!(memory instanceof WebAssembly.Memory)) {
+    throw new Error();
+  }
+
+  const fname = new TextEncoder().encode("/dev/tcp/x:0\0");
+  const pfname = malloc(fname.byteLength);
+  if (!pfname) {
+    throw new Error();
+  }
+  new Uint8Array(memory.buffer, pfname, fname.byteLength).set(fname);
+  const fd = open(pfname, 0x0400_0000);
+  expect(fd).not.toBe(-1);
+  await wasi.poll([fd]);
+  const r = close(fd);
+  expect(r).not.toBe(-1);
+});
+
+test("fd_close sock busy", async () => {
+  if (!mod) {
+    throw new Error();
+  }
+
+  const rs = newUint8ArrayReadableStream(new Uint8Array());
+  const ws = newUint8ArrayWritableStream(new Uint8Array());
+  const wasi = new Wasi({
+    netFactory: () => Promise.resolve([rs, ws]),
+    crypto: webcrypto as unknown as Crypto,
+  });
+  const instance = await WebAssembly.instantiate(mod, {
+    wasi_snapshot_preview1: wasi.exports,
+  });
+  wasi.initialize(instance);
+
+  const { fcntl, memory, malloc, free, open, close, recv, send } = instance.exports;
+  if (typeof fcntl !== "function") {
+    throw new Error();
+  }
+  if (typeof malloc !== "function") {
+    throw new Error();
+  }
+  if (typeof free !== "function") {
+    throw new Error();
+  }
+  if (typeof open !== "function") {
+    throw new Error();
+  }
+  if (typeof close !== "function") {
+    throw new Error();
+  }
+  if (typeof recv !== "function") {
+    throw new Error();
+  }
+  if (typeof send !== "function") {
+    throw new Error();
+  }
+  if (!(memory instanceof WebAssembly.Memory)) {
+    throw new Error();
+  }
+
+  const fname = new TextEncoder().encode("/dev/tcp/x:0\0");
+  const pfname = malloc(fname.byteLength);
+  if (!pfname) {
+    throw new Error();
+  }
+  new Uint8Array(memory.buffer, pfname, fname.byteLength).set(fname);
+  const fd = open(pfname, 0x0400_0000);
+  expect(fd).not.toBe(-1);
+  await wasi.poll([fd]);
+
+  const buf = malloc(1);
+  const r1 = recv(fd, buf, 1, 0);
+  expect(r1).toBe(-1); // EAGAIN
+  const r2 = send(fd, buf, 1, 0);
+  expect(r2).toBe(-1); // EAGAIN
+
+  const r = close(fd);
+  expect(r).not.toBe(-1);
 });
 
 test("poll_oneoff", async () => {

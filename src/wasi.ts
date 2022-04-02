@@ -2,6 +2,7 @@ declare global {
   // TODO no type definition in lib.dom.d.ts
   type ReadableStreamBYOBReader = {
     read(view: Uint8Array): Promise<{ value: Uint8Array, done: false } | { value: undefined, done: true }>
+    releaseLock(): void;
   }
 }
 
@@ -119,12 +120,20 @@ type ReadContext = {
 } | {
   state: "idle",
   buf: Uint8Array,
+  stream: ReadableStream<Uint8Array>,
   reader: ReadableStreamBYOBReader,
 } | {
   state: "reading",
+  stream: ReadableStream<Uint8Array>,
   reader: ReadableStreamBYOBReader,
 } | {
   state: "eof",
+  stream: ReadableStream<Uint8Array>,
+} | {
+  state: "closed",
+} | {
+  state: "error",
+  error: unknown,
 }
 
 type WriteContext = {
@@ -132,15 +141,23 @@ type WriteContext = {
 } | {
   state: "idle",
   buf: Uint8Array
+  stream: WritableStream<Uint8Array>,
   writer: WritableStreamDefaultWriter<Uint8Array>
 } | {
   state: "writing",
+  stream: WritableStream<Uint8Array>,
   writer: WritableStreamDefaultWriter<Uint8Array>
 } | {
   state: "wrote",
   len: number,
   buf: Uint8Array
+  stream: WritableStream<Uint8Array>,
   writer: WritableStreamDefaultWriter<Uint8Array>
+} | {
+  state: "closed"
+} | {
+  state: "error"
+  error: unknown,
 }
 
 type SockFd = {
@@ -374,7 +391,7 @@ export default class Wasi {
     for (const fd of fds) {
       const fdi = this.#fds[fd];
       if (!fdi || fdi.type !== "socket") {
-        throw new Error();
+        throw new Error("invalid fd.");
       }
 
       for (const i of [0, 1]) {
@@ -446,7 +463,7 @@ export default class Wasi {
     }
     const stat = fdi.stat;
 
-    const view = new DataView(this.#memory);
+    const view = this.#memview;
     view.setUint8(result + 0, stat.fs_filetype);
     view.setUint16(result + 2, Array.from(stat.fs_flags).reduce((l, r) => l | r, 0), true);
     view.setBigUint64(result + 8, Array.from(stat.fs_rights_base).reduce((l, r) => l | r, 0n), true);
@@ -454,11 +471,20 @@ export default class Wasi {
     return 0;
   }
 
-  fd_filestat_get(fd: number): number {
+  fd_filestat_get(fd: number, result: number): number {
     const fdi = this.#fds[fd];
     switch (fdi?.type) {
       case "urandom": {
-        // TODO
+        const view = this.#memview;
+        // filestat
+        view.setBigUint64(result + 0, 1n, true); // dev
+        view.setBigUint64(result + 8, 1n, true); // ino
+        view.setUint8(result + 16, FILETYPE_CHARACTER_DEVICE); // filetype
+        view.setBigUint64(result + 24, 1n, true); // nlink
+        view.setBigUint64(result + 32, 0n, true); // size
+        view.setBigUint64(result + 40, 0n, true); // atime
+        view.setBigUint64(result + 48, 0n, true); // mtime
+        view.setBigUint64(result + 56, 0n, true); // ctime
         return 0;
       }
     }
@@ -554,15 +580,23 @@ export default class Wasi {
           sig: new Int32Array(new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT * 2)),
         }
         factory(host, Number(port)).then(([r, w]) => {
+          if (fd.rcx.state === "closed" || fd.wcx.state === "closed") {
+            r.cancel().catch(console.warn); // TODO
+            w.close().catch(console.warn); // TODO
+            return;
+          }
+
           fd.rcx = {
             state: "idle",
             buf: new Uint8Array(new ArrayBuffer(1024 * 8), 0, 0),
+            stream: r,
             reader: (r as any).getReader({ mode: "byob" }), // TODO
           }
 
           fd.wcx = {
             state: "idle",
             buf: new Uint8Array(new ArrayBuffer(1024 * 8)),
+            stream: w,
             writer: w.getWriter(),
           }
 
@@ -582,9 +616,66 @@ export default class Wasi {
   }
 
   fd_close(fd: number): number {
+    const fdi = this.#fds[fd];
+    if (!fdi) {
+      return EBADF;
+    }
     delete this.#fds[fd];
-    // TODO cleanup resouce
-    return 0;
+
+    switch (fdi.type) {
+      case "dir":
+        //fallthrough
+      case "urandom":
+        return 0; // NOP
+
+      case "socket": {
+        const { rcx, wcx } = fdi;
+        fdi.rcx = {
+          state: "closed",
+        }
+        fdi.wcx = {
+          state: "closed",
+        }
+
+        switch (rcx.state) {
+          case "connecting":
+            //fallthrough
+          case "closed": // unreachable
+            //fallthrough
+          case "error":
+            break;
+
+          case "idle":
+            rcx.reader.releaseLock();
+            rcx.stream.cancel().catch(console.warn); // TODO EAGAIN?
+            break;
+
+          default:
+            rcx.stream.cancel().catch(console.warn); // TODO EAGAIN?
+            break;
+        }
+
+        switch (wcx.state) {
+          case "connecting":
+            //fallthrough
+          case "closed":
+            //fallthrough
+          case "error":
+            //fallthrough
+            break;
+
+          case "idle":
+            wcx.writer.releaseLock();
+            wcx.stream.close().catch(console.warn); // TODO EAGAIN?
+            break;
+
+          default:
+            wcx.stream.close().catch(console.warn); // TODO EAGAIN?
+            break;
+        }
+        return 0;
+      }
+    }
   }
 
   sock_recv(fd: number, ri_data: number, ri_data_len: number, ri_flags: number, result: number): number {
@@ -607,15 +698,23 @@ export default class Wasi {
           case "reading":
             return EAGAIN;
 
+          case "error":
+            return EINVAL;
+
+          case "closed":
+            // unreachable
+            return EINVAL;
+
           case "eof":
             return 0;
         }
 
         let { buf } = fdi.rcx;
-        const { reader } = fdi.rcx;
+        const { reader, stream } = fdi.rcx;
         if (!buf.length) {
           fdi.rcx = {
             state: "reading",
+            stream,
             reader,
           }
           Atomics.store(fdi.sig, 0, 0);
@@ -623,9 +722,13 @@ export default class Wasi {
           reader.read(new Uint8Array(buf.buffer)).then(({ value, done }) => {
             Atomics.store(fdi.sig, 0, 1);
             Atomics.notify(fdi.sig, 0);
+            if (fdi.rcx.state === "closed") {
+              return;
+            }
 
             if (done) {
               fdi.rcx = {
+                stream,
                 state: "eof",
               }
               return;
@@ -634,9 +737,16 @@ export default class Wasi {
             fdi.rcx = {
               state: "idle",
               buf: value,
+              stream,
               reader,
             }
-          }).catch(console.error); // TODO catch
+          }).catch((error) => {
+            console.warn(error); // TODO
+            fdi.rcx = {
+              state: "error",
+              error,
+            }
+          });
           return EAGAIN;
         }
 
@@ -677,11 +787,19 @@ export default class Wasi {
           case "writing":
             return EAGAIN;
 
+          case "error":
+            return EINVAL;
+
+          case "closed":
+            // unreachable
+            return EINVAL;
+
           case "wrote": {
-            const { len, buf, writer } = fdi.wcx;
+            const { len, buf, stream, writer } = fdi.wcx;
             fdi.wcx = {
               state: "idle",
               buf,
+              stream,
               writer,
             }
             this.#memview.setInt32(result, len, true); // TODO on idle
@@ -689,10 +807,11 @@ export default class Wasi {
           }
         }
         let { buf } = fdi.wcx;
-        const { writer } = fdi.wcx;
+        const { stream, writer } = fdi.wcx;
 
         fdi.wcx = {
           state: "writing",
+          stream,
           writer,
         }
         Atomics.store(fdi.sig, 1, 0);
@@ -711,14 +830,24 @@ export default class Wasi {
         fdi.wcx.writer.write(buf).then(() => {
           Atomics.store(fdi.sig, 1, 1);
           Atomics.notify(fdi.sig, 1);
+          if (fdi.wcx.state === "closed") {
+            return;
+          }
 
           fdi.wcx = {
             state: "wrote",
             len: buf.byteLength,
             buf: new Uint8Array(buf.buffer),
+            stream,
             writer,
           }
-        }); // TODO catch
+        }).catch((error) => {
+          console.warn(error); // TODO
+          fdi.wcx = {
+            state: "error",
+            error,
+          }
+        });
         return EAGAIN;
       }
 

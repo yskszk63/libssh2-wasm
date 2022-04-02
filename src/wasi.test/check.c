@@ -1,3 +1,5 @@
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
@@ -27,5 +29,7 @@ int main() {
     assert(sizeof(struct pollfd) == 8, "err pollfd");
     assert(POLLIN == 0x001, "err POLLIN");
     assert(POLLOUT == 0x002, "err POLLOUT");
+
+    assert(sizeof(struct stat) == 144, "err stat");
     return 0;
 }

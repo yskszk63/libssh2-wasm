@@ -27,4 +27,9 @@ void dummy() {
     poll(NULL, 0, -1);
 
     recv(0, NULL, 0, 0);
+    send(0, NULL, 0, 0);
+
+    fstat(0, NULL);
+
+    read(0, NULL, 0);
 }
