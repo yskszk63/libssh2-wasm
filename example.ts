@@ -10,7 +10,7 @@ const session = await libssh2.connect({
     "[localhost]:2222 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMdYZGgT+jpoNO4HLbRPzAgDzApC1ASA8MI9qV4Mn9Z6",
   ],
   username: "yskszk63",
-  privatekey: () => fs.readFile(new URL("./test_id_ed25519", import.meta.url)),
+  privatekey: () => fs.readFile("./test_id_ed25519"),
 });
 try {
   //const channel = await session.exec("false");
