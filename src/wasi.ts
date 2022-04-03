@@ -643,15 +643,13 @@ export default class Wasi {
           case "closed": // unreachable
             //fallthrough
           case "error":
+            //fallthrough
+          case "reading": // close after task done
             break;
 
           case "idle":
             rcx.reader.releaseLock();
-            rcx.stream.cancel().catch(console.warn); // TODO EAGAIN?
-            break;
-
-          default:
-            rcx.stream.cancel().catch(console.warn); // TODO EAGAIN?
+            rcx.stream.cancel().catch(console.warn); // TODO LOG
             break;
         }
 
@@ -662,14 +660,11 @@ export default class Wasi {
             //fallthrough
           case "error":
             //fallthrough
+          case "writing": // close after task done
             break;
 
           case "idle":
             wcx.writer.releaseLock();
-            wcx.stream.close().catch(console.warn); // TODO EAGAIN?
-            break;
-
-          default:
             wcx.stream.close().catch(console.warn); // TODO EAGAIN?
             break;
         }
@@ -706,6 +701,7 @@ export default class Wasi {
             return EINVAL;
 
           case "eof":
+            this.#memview.setInt32(result, 0, true);
             return 0;
         }
 
@@ -723,6 +719,8 @@ export default class Wasi {
             Atomics.store(fdi.sig, 0, 1);
             Atomics.notify(fdi.sig, 0);
             if (fdi.rcx.state === "closed") {
+              reader.releaseLock();
+              stream.cancel().catch(console.warn); // TODO log
               return;
             }
 
@@ -741,6 +739,8 @@ export default class Wasi {
               reader,
             }
           }).catch((error) => {
+            Atomics.store(fdi.sig, 0, 1);
+            Atomics.notify(fdi.sig, 0);
             console.warn(error); // TODO
             fdi.rcx = {
               state: "error",
@@ -831,6 +831,8 @@ export default class Wasi {
           Atomics.store(fdi.sig, 1, 1);
           Atomics.notify(fdi.sig, 1);
           if (fdi.wcx.state === "closed") {
+            writer.releaseLock();
+            stream.close().catch(console.warn);
             return;
           }
 

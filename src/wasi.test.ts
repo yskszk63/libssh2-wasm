@@ -36,7 +36,7 @@ function newUint8ArrayReadableStream(buf: Uint8Array): ReadableStream<Uint8Array
       }
     },
     pull(controller) {
-      controller.enqueue(buf);
+      controller.enqueue(buf.slice());
       buf = buf.slice(buf.byteLength);
       if (!buf.byteLength) {
         return controller.close();
@@ -820,6 +820,203 @@ test("fd_close sock busy", async () => {
 
   const r = close(fd);
   expect(r).not.toBe(-1);
+});
+
+test("sock_recv", async () => {
+  if (!mod) {
+    throw new Error();
+  }
+
+  const rs = newUint8ArrayReadableStream(new Uint8Array(new TextEncoder().encode("Hello")));
+  const ws = newUint8ArrayWritableStream(new Uint8Array());
+  const wasi = new Wasi({
+    netFactory: () => Promise.resolve([rs, ws]),
+    crypto: webcrypto as unknown as Crypto,
+  });
+  const instance = await WebAssembly.instantiate(mod, {
+    wasi_snapshot_preview1: wasi.exports,
+  });
+  wasi.initialize(instance);
+
+  const { fcntl, memory, malloc, free, open, close, recv, send, errno } = instance.exports;
+  if (typeof fcntl !== "function") {
+    throw new Error();
+  }
+  if (typeof malloc !== "function") {
+    throw new Error();
+  }
+  if (typeof free !== "function") {
+    throw new Error();
+  }
+  if (typeof open !== "function") {
+    throw new Error();
+  }
+  if (typeof close !== "function") {
+    throw new Error();
+  }
+  if (typeof recv !== "function") {
+    throw new Error();
+  }
+  if (typeof send !== "function") {
+    throw new Error();
+  }
+  if (!(memory instanceof WebAssembly.Memory)) {
+    throw new Error();
+  }
+  if (!(errno instanceof WebAssembly.Global)) {
+    throw new Error();
+  }
+
+  const fname = new TextEncoder().encode("/dev/tcp/x:0\0");
+  const pfname = malloc(fname.byteLength);
+  if (!pfname) {
+    throw new Error();
+  }
+  new Uint8Array(memory.buffer, pfname, fname.byteLength).set(fname);
+  const fd = open(pfname, 0x0400_0000);
+  expect(fd).not.toBe(-1);
+  const buf = malloc(5);
+
+  expect(recv(fd, buf, 5, 0)).toBe(-1); // connecting EAGAIN
+  await wasi.poll([fd]);
+  expect(recv(fd, buf, 5, 0)).toBe(-1); // idle -> reading EAGAIN
+  await wasi.poll([fd]);
+  expect(recv(fd, buf, 5, 0)).toBe("Hello".length); // idle -> reading
+  await wasi.poll([fd]);
+  expect(recv(fd, buf, 5, 0)).toBe(-1); // idle -> reading EAGAIN
+  await wasi.poll([fd]);
+  expect(recv(fd, buf, 5, 0)).toBe(0); // eof
+});
+
+test("sock_recv error", async () => {
+  if (!mod) {
+    throw new Error();
+  }
+
+  const rs = new ReadableStream({
+    start(controller) {
+      controller.error("err");
+    },
+    type: "bytes",
+  });
+  const ws = newUint8ArrayWritableStream(new Uint8Array());
+  const wasi = new Wasi({
+    netFactory: () => Promise.resolve([rs, ws]),
+    crypto: webcrypto as unknown as Crypto,
+  });
+  const instance = await WebAssembly.instantiate(mod, {
+    wasi_snapshot_preview1: wasi.exports,
+  });
+  wasi.initialize(instance);
+
+  const { fcntl, memory, malloc, free, open, close, recv, send, errno } = instance.exports;
+  if (typeof fcntl !== "function") {
+    throw new Error();
+  }
+  if (typeof malloc !== "function") {
+    throw new Error();
+  }
+  if (typeof free !== "function") {
+    throw new Error();
+  }
+  if (typeof open !== "function") {
+    throw new Error();
+  }
+  if (typeof close !== "function") {
+    throw new Error();
+  }
+  if (typeof recv !== "function") {
+    throw new Error();
+  }
+  if (typeof send !== "function") {
+    throw new Error();
+  }
+  if (!(memory instanceof WebAssembly.Memory)) {
+    throw new Error();
+  }
+  if (!(errno instanceof WebAssembly.Global)) {
+    throw new Error();
+  }
+
+  const fname = new TextEncoder().encode("/dev/tcp/x:0\0");
+  const pfname = malloc(fname.byteLength);
+  if (!pfname) {
+    throw new Error();
+  }
+  new Uint8Array(memory.buffer, pfname, fname.byteLength).set(fname);
+  const fd = open(pfname, 0x0400_0000);
+  expect(fd).not.toBe(-1);
+  const buf = malloc(5);
+
+  expect(recv(fd, buf, 5, 0)).toBe(-1); // connecting EAGAIN
+  await wasi.poll([fd]);
+  expect(recv(fd, buf, 5, 0)).toBe(-1); // idle -> reading EAGAIN
+  await wasi.poll([fd]);
+  expect(recv(fd, buf, 5, 0)).toBe(-1); // idle -> reading
+});
+
+test("sock_recv invalid", async () => {
+  if (!mod) {
+    throw new Error();
+  }
+
+  const rs = new ReadableStream({
+    start(controller) {
+      controller.error("err");
+    },
+    type: "bytes",
+  });
+  const ws = newUint8ArrayWritableStream(new Uint8Array());
+  const wasi = new Wasi({
+    netFactory: () => Promise.resolve([rs, ws]),
+    crypto: webcrypto as unknown as Crypto,
+  });
+  const instance = await WebAssembly.instantiate(mod, {
+    wasi_snapshot_preview1: wasi.exports,
+  });
+  wasi.initialize(instance);
+
+  const { fcntl, memory, malloc, free, open, close, recv, send, errno } = instance.exports;
+  if (typeof fcntl !== "function") {
+    throw new Error();
+  }
+  if (typeof malloc !== "function") {
+    throw new Error();
+  }
+  if (typeof free !== "function") {
+    throw new Error();
+  }
+  if (typeof open !== "function") {
+    throw new Error();
+  }
+  if (typeof close !== "function") {
+    throw new Error();
+  }
+  if (typeof recv !== "function") {
+    throw new Error();
+  }
+  if (typeof send !== "function") {
+    throw new Error();
+  }
+  if (!(memory instanceof WebAssembly.Memory)) {
+    throw new Error();
+  }
+  if (!(errno instanceof WebAssembly.Global)) {
+    throw new Error();
+  }
+
+  const fname = new TextEncoder().encode("/dev/urandom\0");
+  const pfname = malloc(fname.byteLength);
+  if (!pfname) {
+    throw new Error();
+  }
+  new Uint8Array(memory.buffer, pfname, fname.byteLength).set(fname);
+  const fd = open(pfname, 0x0400_0000);
+  expect(fd).not.toBe(-1);
+  const buf = malloc(5);
+
+  expect(recv(-1, buf, 5, 0)).toBe(-1); // EINVAL
+  expect(recv(fd, buf, 5, 0)).toBe(-1); // EINVAL
 });
 
 test("poll_oneoff", async () => {
