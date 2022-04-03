@@ -844,6 +844,8 @@ export default class Wasi {
             writer,
           }
         }).catch((error) => {
+          Atomics.store(fdi.sig, 1, 1);
+          Atomics.notify(fdi.sig, 1);
           console.warn(error); // TODO
           fdi.wcx = {
             state: "error",

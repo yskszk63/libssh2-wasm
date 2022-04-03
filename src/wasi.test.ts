@@ -46,10 +46,11 @@ function newUint8ArrayReadableStream(buf: Uint8Array): ReadableStream<Uint8Array
   });
 }
 
-function newUint8ArrayWritableStream(buf: Uint8Array): WritableStream<Uint8Array> {
-  buf = buf.slice();
-
+function newUint8ArrayWritableStream(dest: Uint8Array[]): WritableStream<Uint8Array> {
   return new WritableStream({
+    write(chunk) {
+      dest.push(chunk.slice());
+    },
   });
 }
 
@@ -663,7 +664,7 @@ test("fd_close sock connecting", async () => {
   }
 
   const rs = newUint8ArrayReadableStream(new Uint8Array());
-  const ws = newUint8ArrayWritableStream(new Uint8Array());
+  const ws = newUint8ArrayWritableStream([]);
   const wasi = new Wasi({
     netFactory: () => Promise.resolve([rs, ws]),
     crypto: webcrypto as unknown as Crypto,
@@ -714,7 +715,7 @@ test("fd_close sock idle", async () => {
   }
 
   const rs = newUint8ArrayReadableStream(new Uint8Array());
-  const ws = newUint8ArrayWritableStream(new Uint8Array());
+  const ws = newUint8ArrayWritableStream([]);
   const wasi = new Wasi({
     netFactory: () => Promise.resolve([rs, ws]),
     crypto: webcrypto as unknown as Crypto,
@@ -766,7 +767,7 @@ test("fd_close sock busy", async () => {
   }
 
   const rs = newUint8ArrayReadableStream(new Uint8Array());
-  const ws = newUint8ArrayWritableStream(new Uint8Array());
+  const ws = newUint8ArrayWritableStream([]);
   const wasi = new Wasi({
     netFactory: () => Promise.resolve([rs, ws]),
     crypto: webcrypto as unknown as Crypto,
@@ -828,7 +829,7 @@ test("sock_recv", async () => {
   }
 
   const rs = newUint8ArrayReadableStream(new Uint8Array(new TextEncoder().encode("Hello")));
-  const ws = newUint8ArrayWritableStream(new Uint8Array());
+  const ws = newUint8ArrayWritableStream([]);
   const wasi = new Wasi({
     netFactory: () => Promise.resolve([rs, ws]),
     crypto: webcrypto as unknown as Crypto,
@@ -899,7 +900,7 @@ test("sock_recv error", async () => {
     },
     type: "bytes",
   });
-  const ws = newUint8ArrayWritableStream(new Uint8Array());
+  const ws = newUint8ArrayWritableStream([]);
   const wasi = new Wasi({
     netFactory: () => Promise.resolve([rs, ws]),
     crypto: webcrypto as unknown as Crypto,
@@ -966,7 +967,7 @@ test("sock_recv invalid", async () => {
     },
     type: "bytes",
   });
-  const ws = newUint8ArrayWritableStream(new Uint8Array());
+  const ws = newUint8ArrayWritableStream([]);
   const wasi = new Wasi({
     netFactory: () => Promise.resolve([rs, ws]),
     crypto: webcrypto as unknown as Crypto,
@@ -1019,13 +1020,204 @@ test("sock_recv invalid", async () => {
   expect(recv(fd, buf, 5, 0)).toBe(-1); // EINVAL
 });
 
+test("sock_send", async () => {
+  if (!mod) {
+    throw new Error();
+  }
+
+  const rs = newUint8ArrayReadableStream(new Uint8Array());
+  const ws = newUint8ArrayWritableStream([]);
+  const wasi = new Wasi({
+    netFactory: () => Promise.resolve([rs, ws]),
+    crypto: webcrypto as unknown as Crypto,
+  });
+  const instance = await WebAssembly.instantiate(mod, {
+    wasi_snapshot_preview1: wasi.exports,
+  });
+  wasi.initialize(instance);
+
+  const { fcntl, memory, malloc, free, open, close, recv, send, errno } = instance.exports;
+  if (typeof fcntl !== "function") {
+    throw new Error();
+  }
+  if (typeof malloc !== "function") {
+    throw new Error();
+  }
+  if (typeof free !== "function") {
+    throw new Error();
+  }
+  if (typeof open !== "function") {
+    throw new Error();
+  }
+  if (typeof close !== "function") {
+    throw new Error();
+  }
+  if (typeof recv !== "function") {
+    throw new Error();
+  }
+  if (typeof send !== "function") {
+    throw new Error();
+  }
+  if (!(memory instanceof WebAssembly.Memory)) {
+    throw new Error();
+  }
+  if (!(errno instanceof WebAssembly.Global)) {
+    throw new Error();
+  }
+
+  const fname = new TextEncoder().encode("/dev/tcp/x:0\0");
+  const pfname = malloc(fname.byteLength);
+  if (!pfname) {
+    throw new Error();
+  }
+  new Uint8Array(memory.buffer, pfname, fname.byteLength).set(fname);
+  const fd = open(pfname, 0x0400_0000);
+  expect(fd).not.toBe(-1);
+  const buf = malloc(1024 * 8 * 2);
+
+  expect(send(fd, buf, 1024 * 8 * 2, 0)).toBe(-1); // connecting EAGAIN
+  await wasi.poll([fd]);
+  expect(send(fd, buf, 1024 * 8 * 2, 0)).toBe(-1); // idle -> writing EAGAIN
+  await wasi.poll([fd]);
+  expect(send(fd, buf, 1024 * 8 * 2, 0)).toBe(1024 * 8); // idle
+});
+
+test("sock_send error", async () => {
+  if (!mod) {
+    throw new Error();
+  }
+
+  const rs = newUint8ArrayReadableStream(new Uint8Array());
+  const ws = new WritableStream({
+    start(controller) {
+      controller.error("err");
+    },
+  });
+  const wasi = new Wasi({
+    netFactory: () => Promise.resolve([rs, ws]),
+    crypto: webcrypto as unknown as Crypto,
+  });
+  const instance = await WebAssembly.instantiate(mod, {
+    wasi_snapshot_preview1: wasi.exports,
+  });
+  wasi.initialize(instance);
+
+  const { fcntl, memory, malloc, free, open, close, recv, send, errno } = instance.exports;
+  if (typeof fcntl !== "function") {
+    throw new Error();
+  }
+  if (typeof malloc !== "function") {
+    throw new Error();
+  }
+  if (typeof free !== "function") {
+    throw new Error();
+  }
+  if (typeof open !== "function") {
+    throw new Error();
+  }
+  if (typeof close !== "function") {
+    throw new Error();
+  }
+  if (typeof recv !== "function") {
+    throw new Error();
+  }
+  if (typeof send !== "function") {
+    throw new Error();
+  }
+  if (!(memory instanceof WebAssembly.Memory)) {
+    throw new Error();
+  }
+  if (!(errno instanceof WebAssembly.Global)) {
+    throw new Error();
+  }
+
+  const fname = new TextEncoder().encode("/dev/tcp/x:0\0");
+  const pfname = malloc(fname.byteLength);
+  if (!pfname) {
+    throw new Error();
+  }
+  new Uint8Array(memory.buffer, pfname, fname.byteLength).set(fname);
+  const fd = open(pfname, 0x0400_0000);
+  expect(fd).not.toBe(-1);
+  const buf = malloc(1024 * 8 * 2);
+
+  expect(send(fd, buf, 1024 * 8 * 2, 0)).toBe(-1); // connecting EAGAIN
+  await wasi.poll([fd]);
+  expect(send(fd, buf, 1024 * 8 * 2, 0)).toBe(-1); // idle -> writing EAGAIN
+  await wasi.poll([fd]);
+  expect(send(fd, buf, 1024 * 8 * 2, 0)).toBe(-1); // error
+});
+
+test("sock_send invalid", async () => {
+  if (!mod) {
+    throw new Error();
+  }
+
+  const rs = newUint8ArrayReadableStream(new Uint8Array());
+  const ws = new WritableStream({
+    start(controller) {
+      controller.error("err");
+    },
+  });
+  const wasi = new Wasi({
+    netFactory: () => Promise.resolve([rs, ws]),
+    crypto: webcrypto as unknown as Crypto,
+  });
+  const instance = await WebAssembly.instantiate(mod, {
+    wasi_snapshot_preview1: wasi.exports,
+  });
+  wasi.initialize(instance);
+
+  const { fcntl, memory, malloc, free, open, close, recv, send, errno } = instance.exports;
+  if (typeof fcntl !== "function") {
+    throw new Error();
+  }
+  if (typeof malloc !== "function") {
+    throw new Error();
+  }
+  if (typeof free !== "function") {
+    throw new Error();
+  }
+  if (typeof open !== "function") {
+    throw new Error();
+  }
+  if (typeof close !== "function") {
+    throw new Error();
+  }
+  if (typeof recv !== "function") {
+    throw new Error();
+  }
+  if (typeof send !== "function") {
+    throw new Error();
+  }
+  if (!(memory instanceof WebAssembly.Memory)) {
+    throw new Error();
+  }
+  if (!(errno instanceof WebAssembly.Global)) {
+    throw new Error();
+  }
+
+  const fname = new TextEncoder().encode("/dev/urandom\0");
+  const pfname = malloc(fname.byteLength);
+  if (!pfname) {
+    throw new Error();
+  }
+  new Uint8Array(memory.buffer, pfname, fname.byteLength).set(fname);
+  const fd = open(pfname, 0x0400_0000);
+  expect(fd).not.toBe(-1);
+  const buf = malloc(1024 * 8 * 2);
+
+  expect(send(fd, buf, 1024 * 8 * 2, 0)).toBe(-1);
+  expect(send(-1, buf, 1024 * 8 * 2, 0)).toBe(-1);
+});
+
 test("poll_oneoff", async () => {
   if (!mod) {
     throw new Error();
   }
 
   const reader = newUint8ArrayReadableStream(new Uint8Array());
-  const writer = newUint8ArrayWritableStream(new Uint8Array());
+  const writer = newUint8ArrayWritableStream([]);
   const wasi = new Wasi({
     netFactory: async (host, port) => {
       expect(host).toStrictEqual("dummy");
