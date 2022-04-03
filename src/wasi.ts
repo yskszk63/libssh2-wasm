@@ -1,8 +1,20 @@
+// partial typing
+// - No type definition in lib.dom.d.ts
+// - Intersections in node and dom type definitions
+interface ReadableStreamBYOBReader {
+  read(view: Uint8Array): Promise<{ value: Uint8Array, done: false } | { value: undefined, done: true }>
+  releaseLock(): void;
+}
+
+interface ReadableStream<R> {
+  getReader(opts: { mode: "byob" }): ReadableStreamBYOBReader
+  tee(): [ReadableStream<R>, ReadableStream<R>];
+  cancel(reason?: any): Promise<void>;
+}
+
 declare global {
-  // TODO no type definition in lib.dom.d.ts
-  type ReadableStreamBYOBReader = {
-    read(view: Uint8Array): Promise<{ value: Uint8Array, done: false } | { value: undefined, done: true }>
-    releaseLock(): void;
+  interface Atomics {
+    waitAsync(typedArray: Int32Array, index: number, value: number): { async: false, value: "not-equal" | "timed-out"} | { async: true, value: Promise<"ok" | "timed-out"> }
   }
 }
 
@@ -342,7 +354,7 @@ export default class Wasi {
    * 4 .. /dev/tcp
    */
   #nextfd: number
-  #netFactory?: (host: string, port: number) => Promise<[ReadableStream<Uint8Array>, WritableStream<Uint8Array>]>
+  #netFactory: (host: string, port: number) => Promise<[ReadableStream<Uint8Array>, WritableStream<Uint8Array>]>
   #crypto: Crypto
 
   constructor({ netFactory, crypto }: WasiConstructorOpts) {
@@ -395,8 +407,7 @@ export default class Wasi {
       }
 
       for (const i of [0, 1]) {
-        // TODO typing
-        const r = (Atomics as any).waitAsync(fdi.sig, i, 0) as { async: false, value: "not-equal" | "timed-out"} | { async: true, value: Promise<"ok" | "timed-out"> };
+        const r = Atomics.waitAsync(fdi.sig, i, 0);
         if (r.async) {
           waiters.push(r.value);
         }
@@ -530,9 +541,14 @@ export default class Wasi {
     }
 
     const name = new TextDecoder().decode(new Uint8Array(this.#memory, path, path_len));
-    switch (parent.name) {
+    const fullname = [parent.name, name].join("/");
+    const [dir, last] = fullname.split(/\/(?=[^/]*$)/, 2);
+    if (!dir || !last) {
+      return EINVAL;
+    }
+    switch (dir) {
       case "/dev": {
-        if (name === "urandom") {
+        if (last === "urandom") {
           const nextfd = this.#nextfd++;
           this.#fds[nextfd] = {
             type: "urandom",
@@ -551,11 +567,8 @@ export default class Wasi {
 
       case "/dev/tcp": {
         const factory = this.#netFactory;
-        if (!factory) {
-          return ENOSYS;
-        }
 
-        const [host, port] = name.split(":", 2);
+        const [host, port] = last.split(":", 2);
         if (!host || !port) {
           return EBADF;
         }
@@ -590,7 +603,7 @@ export default class Wasi {
             state: "idle",
             buf: new Uint8Array(new ArrayBuffer(1024 * 8), 0, 0),
             stream: r,
-            reader: (r as any).getReader({ mode: "byob" }), // TODO
+            reader: r.getReader({ mode: "byob" }),
           }
 
           fd.wcx = {

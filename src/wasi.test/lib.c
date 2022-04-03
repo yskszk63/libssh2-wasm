@@ -10,12 +10,27 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 
-void dummy() {
-    void *r = malloc(0);
-    free(r);
+size_t sizeof_timespec() {
+    return sizeof(struct timespec*);
+}
 
-    struct timespec *tp;
-    clock_gettime(CLOCK_REALTIME, tp);
+size_t offsetof_timespec_tv_sec() {
+    return offsetof(struct timespec, tv_sec);
+}
+
+size_t offsetof_timespec_tv_nsec() {
+    return offsetof(struct timespec, tv_nsec);
+}
+
+size_t sizeof_stat() {
+    return sizeof(struct stat);
+}
+
+void dummy() {
+    void *p = malloc(0);
+    free(NULL);
+
+    clock_gettime(0, NULL);
 
     fcntl(0, F_GETFL);
 
