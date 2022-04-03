@@ -2,17 +2,10 @@ WASMTIME = wasmtime
 WASI_SDK_ROOT = /opt/wasi-sdk
 CC = $(WASI_SDK_ROOT)/bin/clang
 
-all: libtest.wasm check
+all: libtest.wasm
 
 libtest.wasm: lib.c
 	$(CC) -mexec-model=reactor -Wl,--export-all -o $@ $<
-
-check.wasm: check.c
-	$(CC) -o $@ $^
-
-.PHONY: check
-check: check.wasm
-	$(WASMTIME) $<
 
 .PHONY: clean
 clean:

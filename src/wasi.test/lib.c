@@ -26,6 +26,26 @@ size_t sizeof_stat() {
     return sizeof(struct stat);
 }
 
+size_t sizeof_pollfd() {
+    return sizeof(struct pollfd);
+}
+
+int get_F_GETFL() {
+    return F_GETFL;
+}
+
+int get_O_RDONLY() {
+    return O_RDONLY;
+}
+
+int get_POLLIN() {
+    return POLLIN;
+}
+
+int get_POLLOUT() {
+    return POLLOUT;
+}
+
 void dummy() {
     void *p = malloc(0);
     free(NULL);

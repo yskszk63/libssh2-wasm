@@ -47,6 +47,11 @@ interface TestWasmExports {
   offsetof_timespec_tv_sec(): number
   offsetof_timespec_tv_nsec(): number
   sizeof_stat(): number
+  sizeof_pollfd(): number
+  get_F_GETFL(): number
+  get_O_RDONLY(): number
+  get_POLLIN(): number
+  get_POLLOUT(): number
 }
 
 function isTestWasmExports(exports: WebAssembly.Exports): exports is WebAssembly.Exports & TestWasmExports {
@@ -228,7 +233,7 @@ describe("fd_fdstat_get", () => {
     if (!isTestWasmExports(instance.exports)) {
       throw new Error();
     }
-    const { fcntl, memory, malloc, open } = instance.exports;
+    const { fcntl, memory, malloc, open, get_F_GETFL, get_O_RDONLY } = instance.exports;
 
     const fname = new TextEncoder().encode("/dev/urandom\0");
     const pfname = malloc(fname.byteLength);
@@ -236,9 +241,9 @@ describe("fd_fdstat_get", () => {
       throw new Error();
     }
     new Uint8Array(memory.buffer, pfname, fname.byteLength).set(fname);
-    const fd = open(pfname, 0x0400_0000);
-    const r = fcntl(fd, 3/*F_GETFL*/);
-    expect(r).toBe(0x0400_0000 /*O_RDONLY*/);
+    const fd = open(pfname, get_O_RDONLY());
+    const r = fcntl(fd, get_F_GETFL());
+    expect(r).toBe(get_O_RDONLY());
   });
 
   test("invalid", async () => {
@@ -253,8 +258,8 @@ describe("fd_fdstat_get", () => {
     if (!isTestWasmExports(instance.exports)) {
       throw new Error();
     }
-    const { fcntl } = instance.exports;
-    const r = fcntl(0, 3/*F_GETFL*/);
+    const { fcntl, get_F_GETFL } = instance.exports;
+    const r = fcntl(0, get_F_GETFL());
     expect(r).toBe(-1);
   });
 });
@@ -279,7 +284,7 @@ describe("fd_fdstat_get", () => {
     if (!isTestWasmExports(instance.exports)) {
       throw new Error();
     }
-    const { memory, malloc, open, fstat, sizeof_stat } = instance.exports;
+    const { memory, malloc, open, fstat, sizeof_stat, get_O_RDONLY } = instance.exports;
 
     const fname = new TextEncoder().encode("/dev/urandom\0");
     const pfname = malloc(fname.byteLength);
@@ -287,7 +292,7 @@ describe("fd_fdstat_get", () => {
       throw new Error();
     }
     new Uint8Array(memory.buffer, pfname, fname.byteLength).set(fname);
-    const fd = open(pfname, 0x0400_0000);
+    const fd = open(pfname, get_O_RDONLY());
     const stat = malloc(sizeof_stat());
     const r = fstat(fd, stat);
     expect(r).toBe(0);
@@ -333,7 +338,7 @@ describe("fd_read", () => {
     if (!isTestWasmExports(instance.exports)) {
       throw new Error();
     }
-    const { memory, malloc, open, read } = instance.exports;
+    const { memory, malloc, open, read, get_O_RDONLY } = instance.exports;
 
     const fname = new TextEncoder().encode("/dev/urandom\0");
     const pfname = malloc(fname.byteLength);
@@ -341,7 +346,7 @@ describe("fd_read", () => {
       throw new Error();
     }
     new Uint8Array(memory.buffer, pfname, fname.byteLength).set(fname);
-    const fd = open(pfname, 0x0400_0000);
+    const fd = open(pfname, get_O_RDONLY());
     const buf = malloc(8 * 1024);
     for (const b of new Uint8Array(memory.buffer, buf, 8 * 1024)) {
       expect(b).toBe(0);
@@ -393,13 +398,13 @@ describe("path_open", () => {
     if (!isTestWasmExports(instance.exports)) {
       throw new Error();
     }
-    const { memory, malloc, open } = instance.exports;
+    const { memory, malloc, open, get_O_RDONLY } = instance.exports;
 
     const fname = new TextEncoder().encode("/dev/urandom\0");
     const pfname = malloc(fname.byteLength);
     expect(pfname).not.toBe(0);
     new Uint8Array(memory.buffer, pfname, fname.byteLength).set(fname);
-    const fd = open(pfname, 0x0400_0000);
+    const fd = open(pfname, get_O_RDONLY());
     expect(fd).not.toBe(-1);
   });
 
@@ -415,13 +420,13 @@ describe("path_open", () => {
     if (!isTestWasmExports(instance.exports)) {
       throw new Error();
     }
-    const { memory, malloc, open } = instance.exports;
+    const { memory, malloc, open, get_O_RDONLY } = instance.exports;
 
     const fname = new TextEncoder().encode("/dev/cpuinfo\0");
     const pfname = malloc(fname.byteLength);
     expect(pfname).not.toBe(0);
     new Uint8Array(memory.buffer, pfname, fname.byteLength).set(fname);
-    const fd = open(pfname, 0x0400_0000);
+    const fd = open(pfname, get_O_RDONLY());
     expect(fd).toBe(-1);
   });
 
@@ -437,13 +442,13 @@ describe("path_open", () => {
     if (!isTestWasmExports(instance.exports)) {
       throw new Error();
     }
-    const { memory, malloc, open } = instance.exports;
+    const { memory, malloc, open, get_O_RDONLY } = instance.exports;
 
     const fname = new TextEncoder().encode("/dev/shm/xxx\0");
     const pfname = malloc(fname.byteLength);
     expect(pfname).not.toBe(0);
     new Uint8Array(memory.buffer, pfname, fname.byteLength).set(fname);
-    const fd = open(pfname, 0x0400_0000);
+    const fd = open(pfname, get_O_RDONLY());
     expect(fd).toBe(-1);
   });
 
@@ -459,13 +464,13 @@ describe("path_open", () => {
     if (!isTestWasmExports(instance.exports)) {
       throw new Error();
     }
-    const { memory, malloc, open } = instance.exports;
+    const { memory, malloc, open, get_O_RDONLY } = instance.exports;
 
     const fname = new TextEncoder().encode("/dev/tcp/x\0");
     const pfname = malloc(fname.byteLength);
     expect(pfname).not.toBe(0);
     new Uint8Array(memory.buffer, pfname, fname.byteLength).set(fname);
-    const fd = open(pfname, 0x0400_0000);
+    const fd = open(pfname, get_O_RDONLY());
     expect(fd).toBe(-1);
   });
 
@@ -481,13 +486,13 @@ describe("path_open", () => {
     if (!isTestWasmExports(instance.exports)) {
       throw new Error();
     }
-    const { memory, malloc, open } = instance.exports;
+    const { memory, malloc, open, get_O_RDONLY } = instance.exports;
 
     const fname = new TextEncoder().encode("/dev/tcp/x:x\0");
     const pfname = malloc(fname.byteLength);
     expect(pfname).not.toBe(0);
     new Uint8Array(memory.buffer, pfname, fname.byteLength).set(fname);
-    const fd = open(pfname, 0x0400_0000);
+    const fd = open(pfname, get_O_RDONLY());
     expect(fd).toBe(-1);
   });
 });
@@ -515,7 +520,7 @@ describe("fd_close", () => {
     if (!isTestWasmExports(instance.exports)) {
       throw new Error();
     }
-    const { memory, malloc, open, close } = instance.exports;
+    const { memory, malloc, open, close, get_O_RDONLY } = instance.exports;
 
     const fname = new TextEncoder().encode("/dev/urandom\0");
     const pfname = malloc(fname.byteLength);
@@ -523,7 +528,7 @@ describe("fd_close", () => {
       throw new Error();
     }
     new Uint8Array(memory.buffer, pfname, fname.byteLength).set(fname);
-    const fd = open(pfname, 0x0400_0000);
+    const fd = open(pfname, get_O_RDONLY());
     expect(fd).not.toBe(-1);
     const r = close(fd);
     expect(r).not.toBe(-1);
@@ -541,7 +546,7 @@ describe("fd_close", () => {
     if (!isTestWasmExports(instance.exports)) {
       throw new Error();
     }
-    const { memory, malloc, open, close } = instance.exports;
+    const { memory, malloc, open, close, get_O_RDONLY } = instance.exports;
 
     const fname = new TextEncoder().encode("/dev/tcp/x:0\0");
     const pfname = malloc(fname.byteLength);
@@ -549,7 +554,7 @@ describe("fd_close", () => {
       throw new Error();
     }
     new Uint8Array(memory.buffer, pfname, fname.byteLength).set(fname);
-    const fd = open(pfname, 0x0400_0000);
+    const fd = open(pfname, get_O_RDONLY());
     expect(fd).not.toBe(-1);
     const r = close(fd);
     expect(r).not.toBe(-1);
@@ -567,7 +572,7 @@ describe("fd_close", () => {
     if (!isTestWasmExports(instance.exports)) {
       throw new Error();
     }
-    const { memory, malloc, open, close } = instance.exports;
+    const { memory, malloc, open, close, get_O_RDONLY } = instance.exports;
 
     const fname = new TextEncoder().encode("/dev/tcp/x:0\0");
     const pfname = malloc(fname.byteLength);
@@ -575,7 +580,7 @@ describe("fd_close", () => {
       throw new Error();
     }
     new Uint8Array(memory.buffer, pfname, fname.byteLength).set(fname);
-    const fd = open(pfname, 0x0400_0000);
+    const fd = open(pfname, get_O_RDONLY());
     expect(fd).not.toBe(-1);
     await wasi.poll([fd]);
     const r = close(fd);
@@ -594,7 +599,7 @@ describe("fd_close", () => {
     if (!isTestWasmExports(instance.exports)) {
       throw new Error();
     }
-    const { memory, malloc, open, close, recv, send } = instance.exports;
+    const { memory, malloc, open, close, recv, send, get_O_RDONLY } = instance.exports;
 
     const fname = new TextEncoder().encode("/dev/tcp/x:0\0");
     const pfname = malloc(fname.byteLength);
@@ -602,7 +607,7 @@ describe("fd_close", () => {
       throw new Error();
     }
     new Uint8Array(memory.buffer, pfname, fname.byteLength).set(fname);
-    const fd = open(pfname, 0x0400_0000);
+    const fd = open(pfname, get_O_RDONLY());
     expect(fd).not.toBe(-1);
     await wasi.poll([fd]);
 
@@ -640,7 +645,7 @@ describe("sock_recv", () => {
     if (!isTestWasmExports(instance.exports)) {
       throw new Error();
     }
-    const { memory, malloc, open, recv } = instance.exports;
+    const { memory, malloc, open, recv, get_O_RDONLY } = instance.exports;
 
     const fname = new TextEncoder().encode("/dev/tcp/x:0\0");
     const pfname = malloc(fname.byteLength);
@@ -648,7 +653,7 @@ describe("sock_recv", () => {
       throw new Error();
     }
     new Uint8Array(memory.buffer, pfname, fname.byteLength).set(fname);
-    const fd = open(pfname, 0x0400_0000);
+    const fd = open(pfname, get_O_RDONLY());
     expect(fd).not.toBe(-1);
     const buf = malloc(5);
 
@@ -686,7 +691,7 @@ describe("sock_recv", () => {
     if (!isTestWasmExports(instance.exports)) {
       throw new Error();
     }
-    const { memory, malloc, open, recv } = instance.exports;
+    const { memory, malloc, open, recv, get_O_RDONLY } = instance.exports;
 
     const fname = new TextEncoder().encode("/dev/tcp/x:0\0");
     const pfname = malloc(fname.byteLength);
@@ -694,7 +699,7 @@ describe("sock_recv", () => {
       throw new Error();
     }
     new Uint8Array(memory.buffer, pfname, fname.byteLength).set(fname);
-    const fd = open(pfname, 0x0400_0000);
+    const fd = open(pfname, get_O_RDONLY());
     expect(fd).not.toBe(-1);
     const buf = malloc(5);
 
@@ -717,7 +722,7 @@ describe("sock_recv", () => {
     if (!isTestWasmExports(instance.exports)) {
       throw new Error();
     }
-    const { memory, malloc, open, recv } = instance.exports;
+    const { memory, malloc, open, recv, get_O_RDONLY } = instance.exports;
 
     const fname = new TextEncoder().encode("/dev/urandom\0");
     const pfname = malloc(fname.byteLength);
@@ -725,7 +730,7 @@ describe("sock_recv", () => {
       throw new Error();
     }
     new Uint8Array(memory.buffer, pfname, fname.byteLength).set(fname);
-    const fd = open(pfname, 0x0400_0000);
+    const fd = open(pfname, get_O_RDONLY());
     expect(fd).not.toBe(-1);
     const buf = malloc(5);
 
@@ -774,7 +779,7 @@ describe("sock_send", () => {
     if (!isTestWasmExports(instance.exports)) {
       throw new Error();
     }
-    const { memory, malloc, open, send } = instance.exports;
+    const { memory, malloc, open, send, get_O_RDONLY } = instance.exports;
 
     const fname = new TextEncoder().encode("/dev/tcp/x:0\0");
     const pfname = malloc(fname.byteLength);
@@ -782,7 +787,7 @@ describe("sock_send", () => {
       throw new Error();
     }
     new Uint8Array(memory.buffer, pfname, fname.byteLength).set(fname);
-    const fd = open(pfname, 0x0400_0000);
+    const fd = open(pfname, get_O_RDONLY());
     expect(fd).not.toBe(-1);
     const buf = malloc(1024 * 8 * 2);
 
@@ -815,7 +820,7 @@ describe("sock_send", () => {
     if (!isTestWasmExports(instance.exports)) {
       throw new Error();
     }
-    const { memory, malloc, open, send } = instance.exports;
+    const { memory, malloc, open, send, get_O_RDONLY } = instance.exports;
 
     const fname = new TextEncoder().encode("/dev/tcp/x:0\0");
     const pfname = malloc(fname.byteLength);
@@ -823,7 +828,7 @@ describe("sock_send", () => {
       throw new Error();
     }
     new Uint8Array(memory.buffer, pfname, fname.byteLength).set(fname);
-    const fd = open(pfname, 0x0400_0000);
+    const fd = open(pfname, get_O_RDONLY());
     expect(fd).not.toBe(-1);
     const buf = malloc(1024 * 8 * 2);
 
@@ -846,7 +851,7 @@ describe("sock_send", () => {
     if (!isTestWasmExports(instance.exports)) {
       throw new Error();
     }
-    const { memory, malloc, open, send } = instance.exports;
+    const { memory, malloc, open, send, get_O_RDONLY } = instance.exports;
 
     const fname = new TextEncoder().encode("/dev/urandom\0");
     const pfname = malloc(fname.byteLength);
@@ -854,7 +859,7 @@ describe("sock_send", () => {
       throw new Error();
     }
     new Uint8Array(memory.buffer, pfname, fname.byteLength).set(fname);
-    const fd = open(pfname, 0x0400_0000);
+    const fd = open(pfname, get_O_RDONLY());
     expect(fd).not.toBe(-1);
     const buf = malloc(1024 * 8 * 2);
 
@@ -905,19 +910,19 @@ describe("poll_oneoff", () => {
     if (!isTestWasmExports(instance.exports)) {
       throw new Error();
     }
-    const { memory, malloc, open, poll, recv } = instance.exports;
+    const { memory, malloc, open, poll, recv, sizeof_pollfd, get_O_RDONLY, get_POLLIN, get_POLLOUT } = instance.exports;
 
     const path = new TextEncoder().encode("/dev/tcp/dummy:0");
     const ppath = malloc(path.byteLength);
     new Uint8Array(memory.buffer, ppath, path.byteLength).set(path);
-    const fd = open(ppath, 0x0400_0000);
+    const fd = open(ppath, get_O_RDONLY());
     if (fd < 0) {
       throw new Error(`err ${fd}`);
     }
-    const fds = malloc(8);
+    const fds = malloc(sizeof_pollfd());
     ((v: DataView) => {
       v.setInt32(0, fd, true); // fd
-      v.setInt16(4, 0x001 | 0x002, true); // events POLLIN | POLLOUT
+      v.setInt16(4, get_POLLIN() | get_POLLOUT(), true); // events
       v.setInt16(6, 0, true); // revents
     })(new DataView(memory.buffer, fds, 8));
     {
@@ -961,12 +966,12 @@ describe("poll_oneoff", () => {
     if (!isTestWasmExports(instance.exports)) {
       throw new Error();
     }
-    const { memory, malloc, poll } = instance.exports;
+    const { memory, malloc, poll, sizeof_pollfd, get_POLLIN } = instance.exports;
 
-    const fds = malloc(8);
+    const fds = malloc(sizeof_pollfd());
     ((v: DataView) => {
       v.setInt32(0, 0, true); // fd
-      v.setInt16(4, 0x001, true); // events POLLIN
+      v.setInt16(4, get_POLLIN(), true); // events
       v.setInt16(6, 0, true); // revents
     })(new DataView(memory.buffer, fds, 8));
     const r = poll(fds, 1, -1);
@@ -985,12 +990,12 @@ describe("poll_oneoff", () => {
     if (!isTestWasmExports(instance.exports)) {
       throw new Error();
     }
-    const { memory, malloc, poll } = instance.exports;
+    const { memory, malloc, poll, sizeof_pollfd, get_POLLOUT } = instance.exports;
 
-    const fds = malloc(8);
+    const fds = malloc(sizeof_pollfd());
     ((v: DataView) => {
       v.setInt32(0, 0, true); // fd
-      v.setInt16(4, 0x002, true); // events POLLOUT
+      v.setInt16(4, get_POLLOUT(), true); // events
       v.setInt16(6, 0, true); // revents
     })(new DataView(memory.buffer, fds, 8));
     const r = poll(fds, 1, -1);
