@@ -341,6 +341,7 @@ const FD_TCP = 4;
 type WasiConstructorOpts = {
   netFactory: (host: string, port: number) => Promise<[ReadableStream<Uint8Array>, WritableStream<Uint8Array>]>,
   crypto: Crypto,
+  logger?: (...args: unknown[]) => void,
 }
 
 export default class Wasi {
@@ -356,8 +357,9 @@ export default class Wasi {
   #nextfd: number
   #netFactory: (host: string, port: number) => Promise<[ReadableStream<Uint8Array>, WritableStream<Uint8Array>]>
   #crypto: Crypto
+  #logger: (...args: unknown[]) => void
 
-  constructor({ netFactory, crypto }: WasiConstructorOpts) {
+  constructor({ netFactory, crypto, logger }: WasiConstructorOpts) {
     this.#fds = {
       [FD_DEV]: {
         type: "dir",
@@ -383,6 +385,7 @@ export default class Wasi {
     this.#netFactory = netFactory;
     this.#nextfd = 4;
     this.#crypto = crypto;
+    this.#logger = logger ?? console.warn;
   }
 
   initialize(instance: WebAssembly.Instance) {
@@ -594,8 +597,8 @@ export default class Wasi {
         }
         factory(host, Number(port)).then(([r, w]) => {
           if (fd.rcx.state === "closed" || fd.wcx.state === "closed") {
-            r.cancel().catch(console.warn); // TODO
-            w.close().catch(console.warn); // TODO
+            r.cancel().catch(this.#logger);
+            w.close().catch(this.#logger);
             return;
           }
 
@@ -662,7 +665,7 @@ export default class Wasi {
 
           case "idle":
             rcx.reader.releaseLock();
-            rcx.stream.cancel().catch(console.warn); // TODO LOG
+            rcx.stream.cancel().catch(this.#logger);
             break;
         }
 
@@ -678,7 +681,7 @@ export default class Wasi {
 
           case "idle":
             wcx.writer.releaseLock();
-            wcx.stream.close().catch(console.warn); // TODO EAGAIN?
+            wcx.stream.close().catch(this.#logger);
             break;
         }
         return 0;
@@ -733,7 +736,7 @@ export default class Wasi {
             Atomics.notify(fdi.sig, 0);
             if (fdi.rcx.state === "closed") {
               reader.releaseLock();
-              stream.cancel().catch(console.warn); // TODO log
+              stream.cancel().catch(this.#logger);
               return;
             }
 
@@ -754,7 +757,7 @@ export default class Wasi {
           }).catch((error) => {
             Atomics.store(fdi.sig, 0, 1);
             Atomics.notify(fdi.sig, 0);
-            console.warn(error); // TODO
+            this.#logger(error);
             fdi.rcx = {
               state: "error",
               error,
@@ -859,7 +862,7 @@ export default class Wasi {
         }).catch((error) => {
           Atomics.store(fdi.sig, 1, 1);
           Atomics.notify(fdi.sig, 1);
-          console.warn(error); // TODO
+          this.#logger(error);
           fdi.wcx = {
             state: "error",
             error,

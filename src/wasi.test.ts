@@ -682,6 +682,7 @@ describe("sock_recv", () => {
     const wasi = new Wasi({
       netFactory: () => Promise.resolve([rs, ws]),
       crypto,
+      logger() {}, // TODO assert
     });
     const instance = await WebAssembly.instantiate(mod, {
       wasi_snapshot_preview1: wasi.exports,
@@ -811,6 +812,7 @@ describe("sock_send", () => {
     const wasi = new Wasi({
       netFactory: () => Promise.resolve([rs, ws]),
       crypto,
+      logger() {}, // TODO assert
     });
     const instance = await WebAssembly.instantiate(mod, {
       wasi_snapshot_preview1: wasi.exports,
