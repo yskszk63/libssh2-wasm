@@ -15,7 +15,7 @@ beforeAll(async () => {
     throw new Error("no import.meta.url");
   }
   const dir = new URL("./wasi.test/", import.meta.url);
-  const proc = spawn("make", ["-C", fileURLToPath(dir)], { stdio: "ignore" });
+  const proc = spawn("make", ["-C", fileURLToPath(dir)], { stdio: ["ignore", "inherit", "inherit"] });
   const result = await new Promise<number>((resolve, reject) => {
     proc.on("exit", resolve);
     proc.on("error", reject);
