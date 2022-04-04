@@ -461,7 +461,8 @@ class SessionChannel {
             );
           }
         }
-        await it.#session.nbcall(
+        // https://github.com/libssh2/libssh2/issues/614
+        await it.#session.nbcallio(
           it.#exports.libssh2_channel_flush_ex,
           it.#channel,
           0,
