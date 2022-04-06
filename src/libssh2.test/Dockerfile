@@ -9,12 +9,14 @@ rm -rf /var/lib/apt/lists/*
 mkdir /run/sshd
 mkdir ~/.ssh
 chmod 700 ~/.ssh
-touch ~/.ssh/known_hosts
 touch ~/.ssh/authorized_keys
-mkdir /conf
 eot
 
-VOLUME /conf
-ADD entrypoint.sh /
+ADD ssh_host_ed25519_key /etc/ssh
+ADD ssh_host_ed25519_key.pub /etc/ssh
+ADD id_ed25519.pub /root/.ssh
+ADD id_rsa.pub /root/.ssh
 
-CMD /bin/bash /entrypoint.sh
+RUN cat ~/.ssh/*.pub > /root/.ssh/authorized_keys
+
+CMD /usr/sbin/sshd -De

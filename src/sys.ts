@@ -63,6 +63,7 @@ export type Libssh2Exports = {
   libssh2_session_last_errno(session: number): number
   libssh2_session_disconnect_ex(session: number, reason: number, description: number, lang: number): number
   libssh2_session_hostkey(session: number, len: number, type: number): number
+  libssh2_session_method_pref(session: number, method_type: number, prefs: number): number
 
   libssh2_userauth_authenticated(session: number): number
   libssh2_userauth_publickey_frommemory(session: number, username: number, username_len: number, publickeydata: number, publickeydata_len: number, privatekeydata: number, privatekeydata_len: number, passphrase: number): number

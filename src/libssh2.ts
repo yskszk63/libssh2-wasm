@@ -15,7 +15,7 @@ type NewLibssh2Opts = {
 export type ConnectOpts = {
   host: string
   port?: number
-  knownhosts: string[]
+  knownhost: string
   username: string
   privatekey: () => Promise<Uint8Array>
 }
@@ -67,7 +67,7 @@ class Libssh2 {
 
   constructor(exports: WebAssembly.Exports, wasi: Wasi, _ReadableStream: typeof ReadableStream, _WritableStream: typeof WritableStream) {
     if (!sys.isWasiExports(exports) || !sys.isCExports(exports) || !sys.isLibssh2Exports(exports)) {
-      throw new TypeError();
+      throw new TypeError("Missing exported function");
     }
     this.#exports = exports;
     this.#wasi = wasi;
@@ -101,7 +101,7 @@ class Libssh2 {
     return this.#wasi.poll(fds);
   }
 
-  async connect({ host, port=22, knownhosts, username, privatekey }: ConnectOpts): Promise<Session> {
+  async connect({ host, port=22, knownhost, username, privatekey }: ConnectOpts): Promise<Session> {
     const fd = this.#cenv.with([`/dev/tcp/${host}:${port}`], (path) => {
       // TODO flags
       return this.#cenv.ccall(this.#exports.open, path.ptr, 0x0400_0000);
@@ -112,15 +112,18 @@ class Libssh2 {
         throw new Error(`failed to libssh2_session_init_ex`);
       }
       this.#exports.libssh2_session_set_blocking(session, 0);
-
       const result = new Session(this, session, fd);
-      const hostkey = await result.handshake();
 
       const hosts = result.newKnownhost();
       try {
-        for (const line of knownhosts) {
-          hosts.readline(line);
+        hosts.readline(knownhost);
+        const ktype = knownhost.split(" ", 3)[1];
+        if (typeof ktype === "undefined") {
+          throw new Error("failed to get key type.");
         }
+        result.methodPref(1/*LIBSSH2_METHOD_HOSTKEY*/, ktype);
+
+        const hostkey = await result.handshake();
         hosts.checkp(host, port, hostkey);
 
       } finally {
@@ -255,6 +258,24 @@ class Session {
         key.ptr,
         key.len,
         0);
+    });
+  }
+
+  methodPref(methodType: number, prefs: string) {
+    const it = this;
+    return this.#cenv.with([prefs], (prefs) => {
+      const result = this.#exports.libssh2_session_method_pref(
+        this.#session,
+        methodType,
+        prefs.ptr,
+      );
+      if (result !== 0) {
+        it.#cenv.with([it.#cenv.malloc(4), it.#cenv.malloc(4)], (ptr, len) => {
+          it.#exports.libssh2_session_last_error(it.#session, ptr.ptr, len.ptr, 0);
+          const buf = it.#cenv.ref(it.#cenv.u32(ptr), it.#cenv.u32(len));
+          throw new Error(it.#cenv.str(buf));
+        });
+      }
     });
   }
 

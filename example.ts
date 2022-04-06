@@ -6,9 +6,7 @@ import * as libssh2 from "./src/node.js";
 const session = await libssh2.connect({
   host: "localhost",
   port: 2222,
-  knownhosts: [
-    "[localhost]:2222 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMdYZGgT+jpoNO4HLbRPzAgDzApC1ASA8MI9qV4Mn9Z6",
-  ],
+  knownhost: "[localhost]:2222 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMdYZGgT+jpoNO4HLbRPzAgDzApC1ASA8MI9qV4Mn9Z6",
   username: "yskszk63",
   privatekey: () => fs.readFile("./test_id_ed25519"),
 });
