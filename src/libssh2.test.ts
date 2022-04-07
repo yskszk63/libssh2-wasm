@@ -218,8 +218,9 @@ describe("Session.connect", () => {
       username: "root",
       privatekey: () => fs.readFile(new URL("./libssh2.test/id_ed25519", import.meta.url)),
     });
-    expect(result).rejects.toThrowError("Knownhost key check mismatch");
+    await expect(result).rejects.toThrowError("Knownhost key check mismatch");
   });
+
   test("host key unknown", async () => {
     if (!container) {
       throw new Error();
@@ -238,6 +239,27 @@ describe("Session.connect", () => {
       username: "root",
       privatekey: () => fs.readFile(new URL("./libssh2.test/id_ed25519", import.meta.url)),
     });
-    expect(result).rejects.toThrowError("Knownhost key check notfound");
+    await expect(result).rejects.toThrowError("Knownhost key check notfound");
+  });
+
+  test("authenticate failure", async () => {
+    if (!container) {
+      throw new Error();
+    }
+
+    const lib = await newLibssh2({
+      fetcher,
+      netFactory,
+      crypto: webcrypto as any,
+      ReadableStream,
+      WritableStream: WritableStream as any,
+    });
+    const result = lib.connect({
+      host: container.ipaddr,
+      knownhost: `${container.ipaddr} ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINN5qBcVhQt0gPmGxgsxgt9429S74QH/LWGuHjVBPZ9p`,
+      username: "rootx",
+      privatekey: () => fs.readFile(new URL("./libssh2.test/id_ed25519", import.meta.url)),
+    });
+    await expect(result).rejects.toThrow("-18: Username/PublicKey combination invalid");
   });
 });

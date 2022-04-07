@@ -15,7 +15,7 @@ beforeAll(async () => {
     throw new Error("no import.meta.url");
   }
   const dir = new URL("./wasi.test/", import.meta.url);
-  const proc = spawn("make", ["-C", fileURLToPath(dir)], { stdio: ["ignore", "inherit", "inherit"] });
+  const proc = spawn("make", ["-C", fileURLToPath(dir)], { stdio: ["ignore", "ignore", "inherit"] });
   const result = await new Promise<number>((resolve, reject) => {
     proc.on("exit", resolve);
     proc.on("error", reject);
@@ -892,10 +892,10 @@ describe("poll_oneoff", () => {
   const reader = newUint8ArrayReadableStream(new Uint8Array());
   const writer = newUint8ArrayWritableStream([]);
   const wasi = new Wasi({
-    netFactory: async (host, port) => {
+    netFactory: (host, port) => {
       expect(host).toStrictEqual("dummy");
       expect(port).toStrictEqual(0);
-      return [reader, writer];
+      return Promise.resolve([reader, writer]);
     },
     crypto,
   });
