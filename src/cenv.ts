@@ -152,8 +152,7 @@ export default class CEnv {
     }
 
     if (r instanceof Promise) {
-      r.finally(free);
-      return r as ReturnType<F>;
+      return r.finally(free) as ReturnType<F>;
     }
     free();
     return r;

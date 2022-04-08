@@ -190,7 +190,7 @@ class Session {
         return ret;
       }
       if (ret !== -37/*LIBSSH2_ERROR_EAGAIN*/) {
-        this.#cenv.with([this.#cenv.malloc(4), this.#cenv.malloc(4)], (ptr, len) => {
+        return this.#cenv.with([this.#cenv.malloc(4), this.#cenv.malloc(4)], (ptr, len) => {
           this.#exports.libssh2_session_last_error(this.#session, ptr.ptr, len.ptr, 0);
           const buf = this.#cenv.ref(this.#cenv.u32(ptr), this.#cenv.u32(len));
           throw new Error(`${ret}: ${this.#cenv.str(buf)}`);
@@ -248,7 +248,7 @@ class Session {
       if (username.len === null || key.len === null) {
         throw new Error();
       }
-      await it.nbcall(
+      return it.nbcall(
         it.#exports.libssh2_userauth_publickey_frommemory,
         it.#session,
         username.ptr,
@@ -258,7 +258,7 @@ class Session {
         key.ptr,
         key.len,
         0);
-    });
+    }).then(() => void 0);
   }
 
   methodPref(methodType: number, prefs: string) {
@@ -316,7 +316,7 @@ class Session {
     return channel;
   }
 
-  async disconnect(description: string = "", lang: string = "C") {
+  async disconnect(description = "", lang = "C") {
     await this.#cenv.with([description, lang], async (description, lang) => {
       await this.nbcall(
         this.#exports.libssh2_session_disconnect_ex,
