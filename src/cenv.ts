@@ -124,7 +124,7 @@ export default class CEnv {
     return new CPtr(this, off, len, false);
   }
 
-  with<F extends (...ptrs: CPtr[]) => any>(ss: MapToStrOrCPtr<WithSrc<F>> & Array<CPtr|string>, fn: F): ReturnType<F> {
+  with<F extends (...ptrs: CPtr[]) => unknown>(ss: MapToStrOrCPtr<WithSrc<F>> & Array<CPtr|string>, fn: F): ReturnType<F> {
     const allocs: CPtr[] = [];
     function free() {
       for (const ptr of allocs) {
@@ -134,7 +134,7 @@ export default class CEnv {
       }
     }
 
-    let r;
+    let r: ReturnType<F>;
     try {
       for (const s of ss) {
         if (typeof s === "string") {
@@ -144,7 +144,7 @@ export default class CEnv {
           allocs.push(s);
         }
       }
-      r = fn(...allocs);
+      r = fn(...allocs) as ReturnType<F>;
 
     } catch(e) {
       free();
