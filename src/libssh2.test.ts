@@ -265,3 +265,166 @@ describe("Session.connect", () => {
     await expect(result).rejects.toThrow("-18: Username/PublicKey combination invalid");
   });
 });
+
+describe("Session.exec", () => {
+  test("success", async () => {
+    if (!container) {
+      throw new Error();
+    }
+
+    const lib = await newLibssh2({
+      fetcher,
+      netFactory,
+      crypto,
+      ReadableStream,
+      WritableStream: WritableStream as unknown as typeof globalThis.WritableStream, // TODO
+    });
+    const session = await lib.connect({
+      host: container.ipaddr,
+      knownhost: `${container.ipaddr} ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINN5qBcVhQt0gPmGxgsxgt9429S74QH/LWGuHjVBPZ9p`,
+      username: "root",
+      privatekey: () => fs.readFile(new URL("./libssh2.test/id_ed25519", import.meta.url)),
+    });
+    try {
+      const channel = await session.exec("/bin/true");
+      try {
+        await channel.waitEof();
+        expect(channel.status).toBe(0);
+      } finally {
+        await channel.close();
+        channel.free(); // TODO
+      }
+    } finally {
+      await session.disconnect();
+      session.close(); // TODO
+      session.free(); // TODO
+    }
+  });
+
+  test("exit ne 0", async () => {
+    if (!container) {
+      throw new Error();
+    }
+
+    const lib = await newLibssh2({
+      fetcher,
+      netFactory,
+      crypto,
+      ReadableStream,
+      WritableStream: WritableStream as unknown as typeof globalThis.WritableStream, // TODO
+    });
+    const session = await lib.connect({
+      host: container.ipaddr,
+      knownhost: `${container.ipaddr} ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINN5qBcVhQt0gPmGxgsxgt9429S74QH/LWGuHjVBPZ9p`,
+      username: "root",
+      privatekey: () => fs.readFile(new URL("./libssh2.test/id_ed25519", import.meta.url)),
+    });
+    try {
+      const channel = await session.exec("/bin/false");
+      try {
+        await channel.waitEof();
+        expect(channel.status).toBe(1);
+      } finally {
+        await channel.close();
+        channel.free(); // TODO
+      }
+    } finally {
+      await session.disconnect();
+      session.close(); // TODO
+      session.free(); // TODO
+    }
+  });
+
+  test("stdout", async () => {
+    if (!container) {
+      throw new Error();
+    }
+
+    const lib = await newLibssh2({
+      fetcher,
+      netFactory,
+      crypto,
+      ReadableStream,
+      WritableStream: WritableStream as unknown as typeof globalThis.WritableStream, // TODO
+    });
+    const session = await lib.connect({
+      host: container.ipaddr,
+      knownhost: `${container.ipaddr} ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINN5qBcVhQt0gPmGxgsxgt9429S74QH/LWGuHjVBPZ9p`,
+      username: "root",
+      privatekey: () => fs.readFile(new URL("./libssh2.test/id_ed25519", import.meta.url)),
+    });
+    try {
+      const channel = await session.exec("/bin/echo -n hello");
+      try {
+        const { stdout } = channel;
+        const chunks = [] as string[];
+        const decoder = new TextDecoder();
+        await stdout.pipeTo(new WritableStream({
+          write(chunk) {
+            chunks.push(decoder.decode(chunk, { stream: true }));
+          },
+          close() {
+            chunks.push(decoder.decode(new Uint8Array()));
+          },
+        }));
+        expect(chunks.join("")).toBe("hello");
+
+        await channel.waitEof();
+      } finally {
+        await channel.close();
+        channel.free(); // TODO
+      }
+    } finally {
+      await session.disconnect();
+      session.close(); // TODO
+      session.free(); // TODO
+    }
+  });
+
+  test("stderr", async () => {
+    if (!container) {
+      throw new Error();
+    }
+
+    const lib = await newLibssh2({
+      fetcher,
+      netFactory,
+      crypto,
+      ReadableStream,
+      WritableStream: WritableStream as unknown as typeof globalThis.WritableStream, // TODO
+    });
+    const session = await lib.connect({
+      host: container.ipaddr,
+      knownhost: `${container.ipaddr} ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINN5qBcVhQt0gPmGxgsxgt9429S74QH/LWGuHjVBPZ9p`,
+      username: "root",
+      privatekey: () => fs.readFile(new URL("./libssh2.test/id_ed25519", import.meta.url)),
+    });
+    try {
+      const channel = await session.exec("/bin/bash -c '/bin/echo -n hello'");
+      try {
+        const { stderr } = channel;
+        const chunks = [] as string[];
+        const decoder = new TextDecoder();
+        await stderr.pipeTo(new WritableStream({
+          write(chunk) {
+            chunks.push(decoder.decode(chunk, { stream: true }));
+          },
+          close() {
+            chunks.push(decoder.decode(new Uint8Array()));
+          },
+        }));
+        expect(chunks.join("")).toBe("hello");
+
+        await channel.waitEof();
+      } finally {
+        await channel.close();
+        channel.free(); // TODO
+      }
+    } finally {
+      await session.disconnect();
+      session.close(); // TODO
+      session.free(); // TODO
+    }
+  });
+
+});

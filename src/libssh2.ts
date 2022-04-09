@@ -512,15 +512,15 @@ class SessionChannel {
     return this.#_channel;
   }
 
-  get stdin(): WritableStream {
+  get stdin(): WritableStream<Uint8Array> {
     return this.#stdin;
   }
 
-  get stdout(): ReadableStream {
+  get stdout(): ReadableStream<Uint8Array> {
     return this.#stdout;
   }
 
-  get stderr(): ReadableStream {
+  get stderr(): ReadableStream<Uint8Array> {
     return this.#stderr;
   }
 
