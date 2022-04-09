@@ -8,6 +8,8 @@ import path from "path";
 
 import { newLibssh2 } from "./libssh2.js";
 
+const crypto = webcrypto as unknown as Crypto;
+
 let container: undefined | {
   id: string
   ipaddr: string
@@ -91,7 +93,7 @@ function fetcher(){
   return fs.readFile(new URL("../libssh2.wasm", import.meta.url));
 }
 
-async function netFactory(host: string, port: number): Promise<[ReadableStream<Uint8Array>, WritableStream<Uint8Array>]> {
+function netFactory(host: string, port: number): Promise<[ReadableStream<Uint8Array>, WritableStream<Uint8Array>]> {
   const sock = net.createConnection(port, host);
   sock.pause();
 
@@ -150,7 +152,7 @@ async function netFactory(host: string, port: number): Promise<[ReadableStream<U
     },
   });
 
-  return [reader, writer];
+  return Promise.resolve([reader, writer]);
 }
 
 describe("newLibssh2", () => {
@@ -158,9 +160,9 @@ describe("newLibssh2", () => {
     await newLibssh2({
       fetcher,
       netFactory,
-      crypto: webcrypto as any,
+      crypto,
       ReadableStream,
-      WritableStream: WritableStream as any,
+      WritableStream: WritableStream as unknown as typeof globalThis.WritableStream, // TODO
     });
   });
 
@@ -168,9 +170,9 @@ describe("newLibssh2", () => {
     const t = newLibssh2({
       fetcher: () => cc("/*empty*/"),
       netFactory,
-      crypto: webcrypto as any,
+      crypto,
       ReadableStream,
-      WritableStream: WritableStream as any,
+      WritableStream: WritableStream as unknown as typeof globalThis.WritableStream, // TODO
     });
     await expect(t).rejects.toThrowError("Missing exported function");
   });
@@ -185,9 +187,9 @@ describe("Session.connect", () => {
     const lib = await newLibssh2({
       fetcher,
       netFactory,
-      crypto: webcrypto as any,
+      crypto,
       ReadableStream,
-      WritableStream: WritableStream as any,
+      WritableStream: WritableStream as unknown as typeof globalThis.WritableStream, // TODO
     });
     const session = await lib.connect({
       host: container.ipaddr,
@@ -208,9 +210,9 @@ describe("Session.connect", () => {
     const lib = await newLibssh2({
       fetcher,
       netFactory,
-      crypto: webcrypto as any,
+      crypto,
       ReadableStream,
-      WritableStream: WritableStream as any,
+      WritableStream: WritableStream as unknown as typeof globalThis.WritableStream, // TODO
     });
     const result = lib.connect({
       host: container.ipaddr,
@@ -229,9 +231,9 @@ describe("Session.connect", () => {
     const lib = await newLibssh2({
       fetcher,
       netFactory,
-      crypto: webcrypto as any,
+      crypto,
       ReadableStream,
-      WritableStream: WritableStream as any,
+      WritableStream: WritableStream as unknown as typeof globalThis.WritableStream, // TODO
     });
     const result = lib.connect({
       host: container.ipaddr,
@@ -250,9 +252,9 @@ describe("Session.connect", () => {
     const lib = await newLibssh2({
       fetcher,
       netFactory,
-      crypto: webcrypto as any,
+      crypto,
       ReadableStream,
-      WritableStream: WritableStream as any,
+      WritableStream: WritableStream as unknown as typeof globalThis.WritableStream, // TODO
     });
     const result = lib.connect({
       host: container.ipaddr,
