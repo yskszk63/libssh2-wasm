@@ -400,7 +400,7 @@ describe("Session.exec", () => {
       privatekey: () => fs.readFile(new URL("./libssh2.test/id_ed25519", import.meta.url)),
     });
     try {
-      const channel = await session.exec("/bin/bash -c '/bin/echo -n hello'");
+      const channel = await session.exec("/bin/bash -c '/bin/echo -n hello >&2'");
       try {
         const { stderr } = channel;
         const chunks = [] as string[];
@@ -413,6 +413,60 @@ describe("Session.exec", () => {
             chunks.push(decoder.decode(new Uint8Array()));
           },
         }));
+        expect(chunks.join("")).toBe("hello");
+
+        await channel.waitEof();
+      } finally {
+        await channel.close();
+        channel.free(); // TODO
+      }
+    } finally {
+      await session.disconnect();
+      session.close(); // TODO
+      session.free(); // TODO
+    }
+  });
+
+  test("stdin", async () => {
+    if (!container) {
+      throw new Error();
+    }
+
+    const lib = await newLibssh2({
+      fetcher,
+      netFactory,
+      crypto,
+      ReadableStream,
+      WritableStream: WritableStream as unknown as typeof globalThis.WritableStream, // TODO
+    });
+    const session = await lib.connect({
+      host: container.ipaddr,
+      knownhost: `${container.ipaddr} ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINN5qBcVhQt0gPmGxgsxgt9429S74QH/LWGuHjVBPZ9p`,
+      username: "root",
+      privatekey: () => fs.readFile(new URL("./libssh2.test/id_ed25519", import.meta.url)),
+    });
+    try {
+      const channel = await session.exec("/bin/cat");
+      try {
+        const { stdin, stdout } = channel;
+        const chunks = [] as string[];
+        const decoder = new TextDecoder();
+        const t1 = stdout.pipeTo(new WritableStream({
+          write(chunk) {
+            chunks.push(decoder.decode(chunk, { stream: true }));
+          },
+          close() {
+            chunks.push(decoder.decode(new Uint8Array()));
+          },
+        }));
+        const t2 = new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode("hello"));
+            controller.close();
+          },
+          type: "bytes",
+        }).pipeTo(stdin);
+        await Promise.all([t1, t2]);
         expect(chunks.join("")).toBe("hello");
 
         await channel.waitEof();
