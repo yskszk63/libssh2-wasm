@@ -9,7 +9,7 @@ interface ReadableStreamBYOBReader {
 interface ReadableStream<R> {
   getReader(opts: { mode: "byob" }): ReadableStreamBYOBReader
   tee(): [ReadableStream<R>, ReadableStream<R>];
-  cancel(reason?: any): Promise<void>;
+  cancel(reason?: unknown): Promise<void>;
 }
 
 declare global {
@@ -250,6 +250,8 @@ class SubscriptionU {
       case SUBSCRIPTION_U_TAG_FD_WRITE:
         return [t, new SubscriptionFdReadWrite(this.#view, 8)];
     }
+    // @ts-ignore - unreachable, but deno lint says `Expected 'val' to always return a value.`
+    throw new Error();
   }
 }
 
@@ -886,7 +888,7 @@ export default class Wasi {
         case SUBSCRIPTION_U_TAG_CLOCK:
           throw new Error("not implemented");
 
-        case SUBSCRIPTION_U_TAG_FD_READ:
+        case SUBSCRIPTION_U_TAG_FD_READ: {
           const fd = this.#fds[val.file_descriptor];
           if (!fd || fd.type !== "socket") {
             return EINVAL;
@@ -908,7 +910,12 @@ export default class Wasi {
               }
               break;
             }
-            case "eof":
+
+            case "error":
+              //fallthrough
+            case "closed":
+              //fallthrough
+            case "eof": {
               const event = new Event(view, out + ((stored++) * 32/*sizeof event*/));
               event.userdata = sub.userdata;
               event.type = EVENTTYPE_FD_READ;
@@ -917,8 +924,10 @@ export default class Wasi {
                 flags: [],
               }
               break;
+            }
           }
           break;
+        }
 
         case SUBSCRIPTION_U_TAG_FD_WRITE: {
           const fd = this.#fds[val.file_descriptor];
@@ -1003,7 +1012,13 @@ export default class Wasi {
       "sock_send",
       "sock_shutdown",
     ];
-    const it = this;
-    return Object.fromEntries(exports.map(name => [name, (it as any)[name]?.bind(it) ?? stub(name)]));
+    const thisfn = (name: string) => {
+      const fn = (this as unknown as Record<string, unknown>)[name];
+      if (typeof fn !== "function") {
+        return null;
+      }
+      return fn;
+    }
+    return Object.fromEntries(exports.map(name => [name, thisfn(name)?.bind(this) ?? stub(name)]));
   }
 }

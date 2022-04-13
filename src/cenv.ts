@@ -124,7 +124,7 @@ export default class CEnv {
     return new CPtr(this, off, len, false);
   }
 
-  with<F extends (...ptrs: CPtr[]) => any>(ss: MapToStrOrCPtr<WithSrc<F>> & Array<CPtr|string>, fn: F): ReturnType<F> {
+  with<A extends CPtr[], F extends (...ptrs: A) => unknown>(ss: MapToStrOrCPtr<A>, fn: F): ReturnType<F> {
     const allocs: CPtr[] = [];
     function free() {
       for (const ptr of allocs) {
@@ -134,7 +134,7 @@ export default class CEnv {
       }
     }
 
-    let r;
+    let r: ReturnType<F>;
     try {
       for (const s of ss) {
         if (typeof s === "string") {
@@ -144,7 +144,7 @@ export default class CEnv {
           allocs.push(s);
         }
       }
-      r = fn(...allocs);
+      r = fn(...allocs as A) as ReturnType<F>;
 
     } catch(e) {
       free();
@@ -152,14 +152,13 @@ export default class CEnv {
     }
 
     if (r instanceof Promise) {
-      r.finally(free);
-      return r as ReturnType<F>;
+      return r.finally(free) as ReturnType<F>;
     }
     free();
     return r;
   }
 
-  ccall<F extends Function>(fn: F, ...args: ArgumentTypes<F>): number {
+  ccall<A extends unknown[], F extends (...args: A) => number>(fn: F, ...args: A): number {
     const r = fn(...args);
     if (r < 0) {
       const errnum = this.errno;
@@ -170,8 +169,4 @@ export default class CEnv {
   }
 }
 
-// https://stackoverflow.com/questions/51851677/how-to-get-argument-types-from-function-in-typescript
-type ArgumentTypes<F extends Function> = F extends (...args: infer A) => number ? A : never;
-// TODO naming
-type WithSrc<F extends Function> = F extends (...args: infer A) => unknown ? A : never;
-type MapToStrOrCPtr<T> = { [P in keyof T]: CPtr | string };
+type MapToStrOrCPtr<T extends Array<CPtr | string>> = { [P in keyof T]: CPtr | string } & Array<CPtr | string>;

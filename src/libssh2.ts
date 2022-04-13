@@ -2,8 +2,6 @@ import Wasi from "./wasi.js";
 import * as sys from "./sys.js";
 import CEnv, { CPtr } from "./cenv.js";
 
-type ArgumentTypes<F extends Function> = F extends (...args: infer A) => number ? A : never;
-
 type NewLibssh2Opts = {
   fetcher: () => Promise<Response | Uint8Array>,
   netFactory: (host: string, port: number) => Promise<[ReadableStream<Uint8Array>, WritableStream<Uint8Array>]>,
@@ -97,7 +95,7 @@ class Libssh2 {
     return this.#WritableStream;
   }
 
-  async poll(fds: number[]): Promise<void> {
+  poll(fds: number[]): Promise<void> {
     return this.#wasi.poll(fds);
   }
 
@@ -165,7 +163,7 @@ class Session {
     return this.#libssh2.cenv;
   }
 
-  async #poll(): Promise<void> {
+  #poll(): Promise<void> {
     return this.#libssh2.poll([this.#fd]);
   }
 
@@ -183,14 +181,14 @@ class Session {
     return this.#_fd;
   }
 
-  async nbcall<F extends (...args: any[]) => number>(fn: F, ...args: ArgumentTypes<F>): Promise<number> {
+  async nbcall<A extends unknown[], F extends (...args: A) => number>(fn: F, ...args: A): Promise<number> {
     while (true) {
       const ret = fn(...args);
       if (ret === 0) {
         return ret;
       }
       if (ret !== -37/*LIBSSH2_ERROR_EAGAIN*/) {
-        this.#cenv.with([this.#cenv.malloc(4), this.#cenv.malloc(4)], (ptr, len) => {
+        return this.#cenv.with([this.#cenv.malloc(4), this.#cenv.malloc(4)], (ptr, len) => {
           this.#exports.libssh2_session_last_error(this.#session, ptr.ptr, len.ptr, 0);
           const buf = this.#cenv.ref(this.#cenv.u32(ptr), this.#cenv.u32(len));
           throw new Error(`${ret}: ${this.#cenv.str(buf)}`);
@@ -200,7 +198,7 @@ class Session {
     }
   }
 
-  async nbcallio<F extends (...args: any[]) => number>(fn: F, ...args: ArgumentTypes<F>): Promise<number> {
+  async nbcallio<A extends unknown[], F extends (...args: A) => number>(fn: F, ...args: A): Promise<number> {
     while (true) {
       const ret = fn(...args);
       if (ret >= 0) {
@@ -241,16 +239,14 @@ class Session {
   }
 
   async userauthPublickeyFrommemory(username: string, privatekey: () => Promise<Uint8Array>): Promise<void> {
-    const it = this;
-
     const key = await privatekey();
-    return this.#cenv.with([username, this.#cenv.copy(key)], async (username, key) => {
+    return this.#cenv.with([username, this.#cenv.copy(key)], (username, key) => {
       if (username.len === null || key.len === null) {
         throw new Error();
       }
-      await it.nbcall(
-        it.#exports.libssh2_userauth_publickey_frommemory,
-        it.#session,
+      return this.nbcall(
+        this.#exports.libssh2_userauth_publickey_frommemory,
+        this.#session,
         username.ptr,
         username.len - 1,
         0,
@@ -258,11 +254,10 @@ class Session {
         key.ptr,
         key.len,
         0);
-    });
+    }).then(() => void 0);
   }
 
   methodPref(methodType: number, prefs: string) {
-    const it = this;
     return this.#cenv.with([prefs], (prefs) => {
       const result = this.#exports.libssh2_session_method_pref(
         this.#session,
@@ -270,24 +265,23 @@ class Session {
         prefs.ptr,
       );
       if (result !== 0) {
-        it.#cenv.with([it.#cenv.malloc(4), it.#cenv.malloc(4)], (ptr, len) => {
-          it.#exports.libssh2_session_last_error(it.#session, ptr.ptr, len.ptr, 0);
-          const buf = it.#cenv.ref(it.#cenv.u32(ptr), it.#cenv.u32(len));
-          throw new Error(it.#cenv.str(buf));
+        this.#cenv.with([this.#cenv.malloc(4), this.#cenv.malloc(4)], (ptr, len) => {
+          this.#exports.libssh2_session_last_error(this.#session, ptr.ptr, len.ptr, 0);
+          const buf = this.#cenv.ref(this.#cenv.u32(ptr), this.#cenv.u32(len));
+          throw new Error(this.#cenv.str(buf));
         });
       }
     });
   }
 
-  async newChannel(type: "session"): Promise<SessionChannel> {
-    const it = this;
+  newChannel(type: "session"): Promise<SessionChannel> {
     return this.#cenv.with([type], async (channeltype) => {
       if (channeltype.len === null) {
         throw new Error();
       }
       while (true) {
-        const ret = it.#exports.libssh2_channel_open_ex(
-          it.#session,
+        const ret = this.#exports.libssh2_channel_open_ex(
+          this.#session,
           channeltype.ptr,
           channeltype.len - 1,
           (2*1024*1024), // LIBSSH2_CHANNEL_WINDOW_DEFAULT
@@ -298,14 +292,14 @@ class Session {
         if (ret > 0) {
           return new SessionChannel(this.#libssh2, this, ret);
         }
-        if (it.#exports.libssh2_session_last_errno(it.#session) !== -37/*LIBSSH2_ERROR_EAGAIN*/) {
-          it.#cenv.with([it.#cenv.malloc(4), it.#cenv.malloc(4)], (ptr, len) => {
-            it.#exports.libssh2_session_last_error(it.#session, ptr.ptr, len.ptr, 0);
-            const buf = it.#cenv.ref(it.#cenv.u32(ptr), it.#cenv.u32(len));
-            throw new Error(it.#cenv.str(buf));
+        if (this.#exports.libssh2_session_last_errno(this.#session) !== -37/*LIBSSH2_ERROR_EAGAIN*/) {
+          this.#cenv.with([this.#cenv.malloc(4), this.#cenv.malloc(4)], (ptr, len) => {
+            this.#exports.libssh2_session_last_error(this.#session, ptr.ptr, len.ptr, 0);
+            const buf = this.#cenv.ref(this.#cenv.u32(ptr), this.#cenv.u32(len));
+            throw new Error(this.#cenv.str(buf));
           });
         }
-        await it.#poll();
+        await this.#poll();
       }
     });
   }
@@ -316,7 +310,7 @@ class Session {
     return channel;
   }
 
-  async disconnect(description: string = "", lang: string = "C") {
+  async disconnect(description = "", lang = "C") {
     await this.#cenv.with([description, lang], async (description, lang) => {
       await this.nbcall(
         this.#exports.libssh2_session_disconnect_ex,
@@ -413,10 +407,11 @@ class SessionChannel {
     this.#session = session;
     this.#_channel = channel;
 
-    const it = this;
-    const stdoutbuf = it.#cenv.malloc(8 * 1024);
-    const stderrbuf = it.#cenv.malloc(8 * 1024);
-    const stdinbuf = it.#cenv.malloc(8 * 1024);
+    const stdoutbuf = this.#cenv.malloc(8 * 1024);
+    const stderrbuf = this.#cenv.malloc(8 * 1024);
+    const stdinbuf = this.#cenv.malloc(8 * 1024);
+    const exports = this.#exports;
+    const cenv = this.#cenv;
 
     this.#stdout = new libssh2.ReadableStream({
       async pull(controller) {
@@ -424,18 +419,18 @@ class SessionChannel {
           throw new Error();
         }
 
-        const len = await it.#session.nbcallio(
-          it.#exports.libssh2_channel_read_ex,
-          it.#channel,
+        const len = await session.nbcallio(
+          exports.libssh2_channel_read_ex,
+          channel,
           0,
           stdoutbuf.ptr,
           stdoutbuf.len,
         );
         if (len === 0) {
-          it.#cenv.free(stderrbuf);
+          cenv.free(stderrbuf);
           return controller.close();
         }
-        controller.enqueue(it.#cenv.buf(stdoutbuf).subarray(0, len));
+        controller.enqueue(cenv.buf(stdoutbuf).subarray(0, len));
       },
     });
 
@@ -445,18 +440,18 @@ class SessionChannel {
           throw new Error();
         }
 
-        const len = await it.#session.nbcallio(
-          it.#exports.libssh2_channel_read_ex,
-          it.#channel,
+        const len = await session.nbcallio(
+          exports.libssh2_channel_read_ex,
+          channel,
           1, // SSH_EXTENDED_DATA_STDERR
           stderrbuf.ptr,
           stderrbuf.len,
         );
         if (len === 0) {
-          it.#cenv.free(stderrbuf);
+          cenv.free(stderrbuf);
           return controller.close();
         }
-        controller.enqueue(it.#cenv.buf(stderrbuf).subarray(0, len));
+        controller.enqueue(cenv.buf(stderrbuf).subarray(0, len));
       },
     });
 
@@ -468,14 +463,14 @@ class SessionChannel {
 
         while (chunk.byteLength) {
           const len = Math.min(chunk.byteLength, stdinbuf.len);
-          it.#cenv.set(stdinbuf, chunk.subarray(0, len));
+          cenv.set(stdinbuf, chunk.subarray(0, len));
           chunk = chunk.subarray(len);
 
           let remaining = len;
           while (remaining) {
-            remaining -= await it.#session.nbcallio(
-              it.#exports.libssh2_channel_write_ex,
-              it.#channel,
+            remaining -= await session.nbcallio(
+              exports.libssh2_channel_write_ex,
+              channel,
               0,
               stdinbuf.ptr + (len - remaining),
               remaining,
@@ -483,18 +478,18 @@ class SessionChannel {
           }
         }
         // https://github.com/libssh2/libssh2/issues/614
-        await it.#session.nbcallio(
-          it.#exports.libssh2_channel_flush_ex,
-          it.#channel,
+        await session.nbcallio(
+          exports.libssh2_channel_flush_ex,
+          channel,
           0,
         );
       },
 
       async close(): Promise<void> {
-        it.#cenv.free(stdinbuf);
-        await it.#session.nbcall(
-          it.#exports.libssh2_channel_send_eof,
-          it.#channel,
+        cenv.free(stdinbuf);
+        await session.nbcall(
+          exports.libssh2_channel_send_eof,
+          channel,
         );
       },
     });
@@ -515,15 +510,15 @@ class SessionChannel {
     return this.#_channel;
   }
 
-  get stdin(): WritableStream {
+  get stdin(): WritableStream<Uint8Array> {
     return this.#stdin;
   }
 
-  get stdout(): ReadableStream {
+  get stdout(): ReadableStream<Uint8Array> {
     return this.#stdout;
   }
 
-  get stderr(): ReadableStream {
+  get stderr(): ReadableStream<Uint8Array> {
     return this.#stderr;
   }
 

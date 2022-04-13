@@ -13,10 +13,10 @@ export type {
 } from "./libssh2.js";
 
 const libssh2 = await newLibssh2({
-  async fetcher() {
+  fetcher() {
     return fs.readFile(new URL("../libssh2.wasm", import.meta.url));
   },
-  async netFactory(host, port) {
+  netFactory(host, port) {
     const sock = net.createConnection(port, host);
     sock.pause();
 
@@ -58,11 +58,11 @@ const libssh2 = await newLibssh2({
       },
     });
 
-    return [reader, writer];
+    return Promise.resolve([reader, writer]);
   },
-  crypto: webcrypto as any as Crypto, // TODO
+  crypto: webcrypto as unknown as Crypto, // TODO
   ReadableStream: ReadableStream,
-  WritableStream: WritableStream as any, // TODO not compatible
+  WritableStream: WritableStream as unknown as typeof globalThis.WritableStream, // TODO not compatible
 });
 
 export function connect(opts: ConnectOpts) {
