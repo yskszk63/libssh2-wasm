@@ -2,8 +2,6 @@ import Wasi from "./wasi.js";
 import * as sys from "./sys.js";
 import CEnv, { CPtr } from "./cenv.js";
 
-type ArgumentTypes<F extends Function> = F extends (...args: infer A) => number ? A : never;
-
 type NewLibssh2Opts = {
   fetcher: () => Promise<Response | Uint8Array>,
   netFactory: (host: string, port: number) => Promise<[ReadableStream<Uint8Array>, WritableStream<Uint8Array>]>,
@@ -183,7 +181,7 @@ class Session {
     return this.#_fd;
   }
 
-  async nbcall<F extends (...args: any[]) => number>(fn: F, ...args: ArgumentTypes<F>): Promise<number> {
+  async nbcall<A extends unknown[], F extends (...args: A) => number>(fn: F, ...args: A): Promise<number> {
     while (true) {
       const ret = fn(...args);
       if (ret === 0) {
@@ -200,7 +198,7 @@ class Session {
     }
   }
 
-  async nbcallio<F extends (...args: any[]) => number>(fn: F, ...args: ArgumentTypes<F>): Promise<number> {
+  async nbcallio<A extends unknown[], F extends (...args: A) => number>(fn: F, ...args: A): Promise<number> {
     while (true) {
       const ret = fn(...args);
       if (ret >= 0) {
