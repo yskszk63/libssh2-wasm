@@ -15,7 +15,9 @@ beforeAll(async () => {
     throw new Error("no import.meta.url");
   }
   const dir = new URL("./wasi.test/", import.meta.url);
-  const proc = spawn("make", ["-C", fileURLToPath(dir)], { stdio: ["ignore", "ignore", "inherit"] });
+  const proc = spawn("make", ["-C", fileURLToPath(dir)], {
+    stdio: ["ignore", "ignore", "inherit"],
+  });
   const result = await new Promise<number>((resolve, reject) => {
     proc.on("exit", resolve);
     proc.on("error", reject);
@@ -29,32 +31,34 @@ beforeAll(async () => {
 });
 
 interface TestWasmExports {
-  memory: WebAssembly.Memory
+  memory: WebAssembly.Memory;
 
-  malloc(size: number): number
-  free(ptr: number): void
-  clock_gettime(clk_id: number, res: number): number
-  fcntl(fd: number, cmd: number, ...args: number[]): number
-  open(pathname: number, flags: number): number
-  close(fd: number): number
-  fstat(fd: number, buf: number): number
-  read(fd: number, buf: number, count: number): number
-  recv(fd: number, buf: number, len: number, flags: number): number
-  send(fd: number, buf: number, len: number, flags: number): number
-  poll(fds: number, nfds: number, timeout: number): number
+  malloc(size: number): number;
+  free(ptr: number): void;
+  clock_gettime(clk_id: number, res: number): number;
+  fcntl(fd: number, cmd: number, ...args: number[]): number;
+  open(pathname: number, flags: number): number;
+  close(fd: number): number;
+  fstat(fd: number, buf: number): number;
+  read(fd: number, buf: number, count: number): number;
+  recv(fd: number, buf: number, len: number, flags: number): number;
+  send(fd: number, buf: number, len: number, flags: number): number;
+  poll(fds: number, nfds: number, timeout: number): number;
 
-  sizeof_timespec(): number
-  offsetof_timespec_tv_sec(): number
-  offsetof_timespec_tv_nsec(): number
-  sizeof_stat(): number
-  sizeof_pollfd(): number
-  get_F_GETFL(): number
-  get_O_RDONLY(): number
-  get_POLLIN(): number
-  get_POLLOUT(): number
+  sizeof_timespec(): number;
+  offsetof_timespec_tv_sec(): number;
+  offsetof_timespec_tv_nsec(): number;
+  sizeof_stat(): number;
+  sizeof_pollfd(): number;
+  get_F_GETFL(): number;
+  get_O_RDONLY(): number;
+  get_POLLIN(): number;
+  get_POLLOUT(): number;
 }
 
-function isTestWasmExports(exports: WebAssembly.Exports): exports is WebAssembly.Exports & TestWasmExports {
+function isTestWasmExports(
+  exports: WebAssembly.Exports,
+): exports is WebAssembly.Exports & TestWasmExports {
   if (!exports) {
     return false;
   }
@@ -62,7 +66,9 @@ function isTestWasmExports(exports: WebAssembly.Exports): exports is WebAssembly
   return true;
 }
 
-function newUint8ArrayReadableStream(buf: Uint8Array): ReadableStream<Uint8Array> {
+function newUint8ArrayReadableStream(
+  buf: Uint8Array,
+): ReadableStream<Uint8Array> {
   buf = buf.slice();
 
   return new ReadableStream({
@@ -82,7 +88,9 @@ function newUint8ArrayReadableStream(buf: Uint8Array): ReadableStream<Uint8Array
   });
 }
 
-function newUint8ArrayWritableStream(dest: Uint8Array[]): WritableStream<Uint8Array> {
+function newUint8ArrayWritableStream(
+  dest: Uint8Array[],
+): WritableStream<Uint8Array> {
   return new WritableStream({
     write(chunk) {
       dest.push(chunk.slice());
@@ -109,11 +117,19 @@ describe("initialize", () => {
   });
 
   test("no memory", async () => {
-    const mod = await WebAssembly.compile(new Uint8Array([
-      // https://developer.mozilla.org/en-US/docs/WebAssembly/Understanding_the_text_format#the_simplest_module
-      0x00, 0x61, 0x73, 0x6d, // WASM_BINARY_MAGIC
-      0x01, 0x00, 0x00, 0x00, // WASM_BINARY_VERSION
-    ]));
+    const mod = await WebAssembly.compile(
+      new Uint8Array([
+        // https://developer.mozilla.org/en-US/docs/WebAssembly/Understanding_the_text_format#the_simplest_module
+        0x00,
+        0x61,
+        0x73,
+        0x6d, // WASM_BINARY_MAGIC
+        0x01,
+        0x00,
+        0x00,
+        0x00, // WASM_BINARY_VERSION
+      ]),
+    );
 
     const wasi = new Wasi({
       netFactory,
@@ -122,7 +138,9 @@ describe("initialize", () => {
     const instance = await WebAssembly.instantiate(mod, {
       wasi_snapshot_preview1: wasi.exports,
     });
-    expect(() => wasi.initialize(instance)).toThrow("!undefined instanceof WebAssembly.Memory");
+    expect(() => wasi.initialize(instance)).toThrow(
+      "!undefined instanceof WebAssembly.Memory",
+    );
   });
 
   test("no _initialize", async () => {
@@ -132,18 +150,50 @@ describe("initialize", () => {
      *  (export "memory" (memory $0))
      * )
      */
-    const mod = await WebAssembly.compile(new Uint8Array([
-      0x00, 0x61, 0x73, 0x6d, // WASM_BINARY_MAGIC
-      0x01, 0x00, 0x00, 0x00, // WASM_BINARY_VERSION
-      0x05, 0x83, 0x80, 0x80,
-      0x80, 0x00, 0x01, 0x00,
-      0x01, 0x06, 0x81, 0x80,
-      0x80, 0x80, 0x00, 0x00,
-      0x07, 0x8a, 0x80, 0x80,
-      0x80, 0x00, 0x01, 0x06,
-      0x6d, 0x65, 0x6d, 0x6f,
-      0x72, 0x79, 0x02, 0x00,
-    ]));
+    const mod = await WebAssembly.compile(
+      new Uint8Array([
+        0x00,
+        0x61,
+        0x73,
+        0x6d, // WASM_BINARY_MAGIC
+        0x01,
+        0x00,
+        0x00,
+        0x00, // WASM_BINARY_VERSION
+        0x05,
+        0x83,
+        0x80,
+        0x80,
+        0x80,
+        0x00,
+        0x01,
+        0x00,
+        0x01,
+        0x06,
+        0x81,
+        0x80,
+        0x80,
+        0x80,
+        0x00,
+        0x00,
+        0x07,
+        0x8a,
+        0x80,
+        0x80,
+        0x80,
+        0x00,
+        0x01,
+        0x06,
+        0x6d,
+        0x65,
+        0x6d,
+        0x6f,
+        0x72,
+        0x79,
+        0x02,
+        0x00,
+      ]),
+    );
 
     const wasi = new Wasi({
       netFactory: () => Promise.reject("stub"),
@@ -199,15 +249,28 @@ describe("clock_gettime", () => {
     if (!isTestWasmExports(instance.exports)) {
       throw new Error();
     }
-    const { clock_gettime, malloc, memory, sizeof_timespec, offsetof_timespec_tv_sec, offsetof_timespec_tv_nsec } = instance.exports;
+    const {
+      clock_gettime,
+      malloc,
+      memory,
+      sizeof_timespec,
+      offsetof_timespec_tv_sec,
+      offsetof_timespec_tv_nsec,
+    } = instance.exports;
 
     const tp = malloc(sizeof_timespec());
     expect(tp).not.toBe(-1);
     const r = clock_gettime(0, tp);
     expect(r).toBe(0);
-    const tv_sec = new DataView(memory.buffer).getBigUint64(tp + offsetof_timespec_tv_sec(), true);
+    const tv_sec = new DataView(memory.buffer).getBigUint64(
+      tp + offsetof_timespec_tv_sec(),
+      true,
+    );
     expect(tv_sec).toBeGreaterThan(0);
-    const tv_nsec = new DataView(memory.buffer).getInt32(tp + offsetof_timespec_tv_nsec(), true);
+    const tv_nsec = new DataView(memory.buffer).getInt32(
+      tp + offsetof_timespec_tv_nsec(),
+      true,
+    );
     expect(tv_nsec).toBeGreaterThanOrEqual(0);
     expect(tv_nsec).toBeLessThan(1000_000_000n);
   });
@@ -233,7 +296,8 @@ describe("fd_fdstat_get", () => {
     if (!isTestWasmExports(instance.exports)) {
       throw new Error();
     }
-    const { fcntl, memory, malloc, open, get_F_GETFL, get_O_RDONLY } = instance.exports;
+    const { fcntl, memory, malloc, open, get_F_GETFL, get_O_RDONLY } =
+      instance.exports;
 
     const fname = new TextEncoder().encode("/dev/urandom\0");
     const pfname = malloc(fname.byteLength);
@@ -284,7 +348,8 @@ describe("fd_fdstat_get", () => {
     if (!isTestWasmExports(instance.exports)) {
       throw new Error();
     }
-    const { memory, malloc, open, fstat, sizeof_stat, get_O_RDONLY } = instance.exports;
+    const { memory, malloc, open, fstat, sizeof_stat, get_O_RDONLY } =
+      instance.exports;
 
     const fname = new TextEncoder().encode("/dev/urandom\0");
     const pfname = malloc(fname.byteLength);
@@ -352,7 +417,8 @@ describe("fd_read", () => {
       expect(b).toBe(0);
     }
     const r = read(fd, buf, 8 * 1024);
-    expect(new Uint8Array(memory.buffer, buf, 8 * 1024).every(v => v === 0)).toBe(false);
+    expect(new Uint8Array(memory.buffer, buf, 8 * 1024).every((v) => v === 0))
+      .toBe(false);
     expect(r).toBe(8 * 1024);
   });
 
@@ -376,10 +442,11 @@ describe("fd_read", () => {
 });
 
 describe("path_open", () => {
-  const netFactory = () => Promise.resolve([
-    newUint8ArrayReadableStream(new Uint8Array()),
-    newUint8ArrayWritableStream([]),
-  ] as [ReadableStream<Uint8Array>, WritableStream<Uint8Array>]);
+  const netFactory = () =>
+    Promise.resolve([
+      newUint8ArrayReadableStream(new Uint8Array()),
+      newUint8ArrayWritableStream([]),
+    ] as [ReadableStream<Uint8Array>, WritableStream<Uint8Array>]);
 
   const wasi = new Wasi({
     netFactory,
@@ -498,10 +565,11 @@ describe("path_open", () => {
 });
 
 describe("fd_close", () => {
-  const netFactory = () => Promise.resolve([
-    newUint8ArrayReadableStream(new Uint8Array()),
-    newUint8ArrayWritableStream([]),
-  ] as [ReadableStream<Uint8Array>, WritableStream<Uint8Array>]);
+  const netFactory = () =>
+    Promise.resolve([
+      newUint8ArrayReadableStream(new Uint8Array()),
+      newUint8ArrayWritableStream([]),
+    ] as [ReadableStream<Uint8Array>, WritableStream<Uint8Array>]);
 
   const wasi = new Wasi({
     netFactory,
@@ -599,7 +667,8 @@ describe("fd_close", () => {
     if (!isTestWasmExports(instance.exports)) {
       throw new Error();
     }
-    const { memory, malloc, open, close, recv, send, get_O_RDONLY } = instance.exports;
+    const { memory, malloc, open, close, recv, send, get_O_RDONLY } =
+      instance.exports;
 
     const fname = new TextEncoder().encode("/dev/tcp/x:0\0");
     const pfname = malloc(fname.byteLength);
@@ -623,10 +692,13 @@ describe("fd_close", () => {
 });
 
 describe("sock_recv", () => {
-  const netFactory = () => Promise.resolve([
-    newUint8ArrayReadableStream(new Uint8Array(new TextEncoder().encode("Hello"))),
-    newUint8ArrayWritableStream([]),
-  ] as [ReadableStream<Uint8Array>, WritableStream<Uint8Array>]);
+  const netFactory = () =>
+    Promise.resolve([
+      newUint8ArrayReadableStream(
+        new Uint8Array(new TextEncoder().encode("Hello")),
+      ),
+      newUint8ArrayWritableStream([]),
+    ] as [ReadableStream<Uint8Array>, WritableStream<Uint8Array>]);
 
   const wasi = new Wasi({
     netFactory,
@@ -758,10 +830,11 @@ describe("sock_recv", () => {
 });
 
 describe("sock_send", () => {
-  const netFactory = () => Promise.resolve([
-    newUint8ArrayReadableStream(new Uint8Array()),
-    newUint8ArrayWritableStream([]),
-  ] as [ReadableStream<Uint8Array>, WritableStream<Uint8Array>]);
+  const netFactory = () =>
+    Promise.resolve([
+      newUint8ArrayReadableStream(new Uint8Array()),
+      newUint8ArrayWritableStream([]),
+    ] as [ReadableStream<Uint8Array>, WritableStream<Uint8Array>]);
 
   const wasi = new Wasi({
     netFactory,
@@ -912,7 +985,17 @@ describe("poll_oneoff", () => {
     if (!isTestWasmExports(instance.exports)) {
       throw new Error();
     }
-    const { memory, malloc, open, poll, recv, sizeof_pollfd, get_O_RDONLY, get_POLLIN, get_POLLOUT } = instance.exports;
+    const {
+      memory,
+      malloc,
+      open,
+      poll,
+      recv,
+      sizeof_pollfd,
+      get_O_RDONLY,
+      get_POLLIN,
+      get_POLLOUT,
+    } = instance.exports;
 
     const path = new TextEncoder().encode("/dev/tcp/dummy:0");
     const ppath = malloc(path.byteLength);
@@ -968,7 +1051,8 @@ describe("poll_oneoff", () => {
     if (!isTestWasmExports(instance.exports)) {
       throw new Error();
     }
-    const { memory, malloc, poll, sizeof_pollfd, get_POLLIN } = instance.exports;
+    const { memory, malloc, poll, sizeof_pollfd, get_POLLIN } =
+      instance.exports;
 
     const fds = malloc(sizeof_pollfd());
     ((v: DataView) => {
@@ -992,7 +1076,8 @@ describe("poll_oneoff", () => {
     if (!isTestWasmExports(instance.exports)) {
       throw new Error();
     }
-    const { memory, malloc, poll, sizeof_pollfd, get_POLLOUT } = instance.exports;
+    const { memory, malloc, poll, sizeof_pollfd, get_POLLOUT } =
+      instance.exports;
 
     const fds = malloc(sizeof_pollfd());
     ((v: DataView) => {
