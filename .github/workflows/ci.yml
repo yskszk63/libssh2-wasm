@@ -30,3 +30,23 @@ jobs:
       - run: |
           make
           ls libssh2.wasm
+
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: denoland/setup-deno@v1
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '14'
+          cache: 'npm'
+
+      - run: npm run fmt:check
+
+      - run: npm ci
+
+      - run: npx tsc
+
+      - run: npm run lint
