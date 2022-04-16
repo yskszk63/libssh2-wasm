@@ -82,4 +82,6 @@ jobs:
         with:
           name: libssh2.wasm
 
+      - run: docker buildx build src/libssh2.test -t libssh2-test-sshd
+
       - run: npm test # TODO cov
