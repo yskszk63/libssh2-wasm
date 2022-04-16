@@ -66,6 +66,7 @@ beforeAll(async () => {
     id: name,
     ipaddr,
   };
+  console.log("container.id:", container.id, "container.ipaddr:", container.ipaddr);
 }, 60 * 1000);
 
 afterAll(async () => {
