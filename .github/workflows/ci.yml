@@ -60,6 +60,17 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y --no-install-recommends curl ca-certificates patch make binaryen wabt unzip
+          sudo mkdir $WASI_ROOT
+          curl -sSfL $WASI_SDK_URL | sudo tar zxf - -C $WASI_ROOT --strip-components 1
+          echo /opt/wasi-sdk/bin >> $GITHUB_PATH
+        env:
+          WASI_ROOT: /opt/wasi-sdk
+          WASI_SDK_URL: 'https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-14/wasi-sdk-14.0-linux.tar.gz'
+
       - uses: actions/setup-node@v3
         with:
           node-version: '16'
