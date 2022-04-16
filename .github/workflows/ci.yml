@@ -27,9 +27,12 @@ jobs:
           WASI_ROOT: /opt/wasi-sdk
           WASI_SDK_URL: 'https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-14/wasi-sdk-14.0-linux.tar.gz'
 
-      - run: |
-          make
-          ls libssh2.wasm
+      - run: make libssh2.wasm
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: libssh2.wasm
+          path: libssh2.wasm
 
   check:
     runs-on: ubuntu-latest
@@ -40,7 +43,7 @@ jobs:
 
       - uses: actions/setup-node@v3
         with:
-          node-version: '14'
+          node-version: '16'
           cache: 'npm'
 
       - run: npm run fmt:check
@@ -50,3 +53,21 @@ jobs:
       - run: npx tsc
 
       - run: npm run lint
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - uses: actions/download-artifact@v3
+        with:
+          name: libssh2.wasm
+
+      - run: npm test # TODO cov
