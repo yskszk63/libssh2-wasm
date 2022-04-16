@@ -231,30 +231,26 @@ libssh2_ldflags += -Wl,--export=libssh2_version
 $(libssh2_wasm): $(libssh2_so)
 	cp $< $@
 
-$(libssh2_so): $(libssl_a) $(libcrypto_a) $(libssh2_dir)
-	mkdir -p $(libssh2_build_dir)
-	$(CMAKE) -S $(libssh2_dir) -B $(libssh2_build_dir) --toolchain $(WASI_SDK_PREFIX)/share/cmake/wasi-sdk.cmake -DWASI_SDK_PREFIX=$(WASI_SDK_PREFIX) -DBUILD_SHARED_LIBS=ON -DCRYPTO_BACKEND=OpenSSL -DOPENSSL_CRYPTO_LIBRARY=$(openssl_dir)/libcrypto.a -DOPENSSL_SSL_LIBRARY=$(openssl_dir)/libssl.a -DOPENSSL_INCLUDE_DIR=$(openssl_dir)/include -DCMAKE_C_COMPILER_ID=Clang -DCMAKE_SHARED_LINKER_FLAGS="$(libssh2_ldflags)" -DCMAKE_BUILD_TYPE=Release
+$(libssh2_so): $(libssh2_build_dir)/Makefile
 	$(CMAKE) --build $(libssh2_build_dir) --target libssh2
 
-$(libssl_a) $(libcrypto_a): $(openssl_dir)
+$(libssh2_build_dir)/Makefile: $(libssl_a) $(libcrypto_a) $(libssh2_dir)/CMakeLists.txt
+	mkdir -p $(libssh2_build_dir)
+	$(CMAKE) -S $(libssh2_dir) -B $(libssh2_build_dir) --toolchain $(WASI_SDK_PREFIX)/share/cmake/wasi-sdk.cmake -DWASI_SDK_PREFIX=$(WASI_SDK_PREFIX) -DBUILD_SHARED_LIBS=ON -DCRYPTO_BACKEND=OpenSSL -DOPENSSL_CRYPTO_LIBRARY=$(openssl_dir)/libcrypto.a -DOPENSSL_SSL_LIBRARY=$(openssl_dir)/libssl.a -DOPENSSL_INCLUDE_DIR=$(openssl_dir)/include -DCMAKE_C_COMPILER_ID=Clang -DCMAKE_SHARED_LINKER_FLAGS="$(libssh2_ldflags)" -DCMAKE_BUILD_TYPE=Release
+
+$(libssl_a) $(libcrypto_a): $(openssl_dir)/Configure
 	cd $(openssl_dir) && CC=$(CC) AR=$(AR) RANLIB=$(RANLIB) ./Configure $(openssl_configure_opts) $(openssl_target)
 	$(MAKE) -C $(openssl_dir) build_libs CFLAGS="$(openssl_cflags)" LDFLAGS="$(openssl_ldflags)"
 
-$(libssh2_dir): $(libssh2_tar_gz)
-	mkdir -p $@
-	tar zxf $< --strip-components=1 -C $@
-
-$(openssl_dir): $(openssl_tar_gz)
-	mkdir -p $@
-	tar zxf $< --strip-components=1 -C $@
-
-$(libssh2_tar_gz):
-	mkdir -p deps
+$(libssh2_dir)/CMakeLists.txt:
+	mkdir -p dpes $(libssh2_dir)
 	curl -sSfL $(libssh2_url) -o $@
+	tar zxf $< --strip-components=1 -C $@
 
-$(openssl_tar_gz):
-	mkdir -p deps
-	curl -sSfL $(openssl_url) -o $@
+$(openssl_dir)/Configure:
+	mkdir -p deps $(openssl_dir)
+	curl -sSfL $(openssl_url) -o $(openssl_tar_gz)
+	tar zxf $(openssl_tar_gz) --strip-components=1 -C $(openssl_dir)
 
 .PHONY: clean
 clean:
