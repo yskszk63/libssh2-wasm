@@ -244,8 +244,8 @@ $(libssl_a) $(libcrypto_a): $(openssl_dir)/Configure
 
 $(libssh2_dir)/CMakeLists.txt:
 	mkdir -p dpes $(libssh2_dir)
-	curl -sSfL $(libssh2_url) -o $@
-	tar zxf $< --strip-components=1 -C $@
+	curl -sSfL $(libssh2_url) -o $(libssh2_tar_gz)
+	tar zxf $(libssh2_tar_gz) --strip-components=1 -C $(libssh2_dir)
 
 $(openssl_dir)/Configure:
 	mkdir -p deps $(openssl_dir)
