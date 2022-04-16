@@ -1,7 +1,5 @@
 libssh2.wasm
-libssh2/
-libssh2_build/
-openssl/
+deps/
 coverage/
 node_modules/
 *.wasm
