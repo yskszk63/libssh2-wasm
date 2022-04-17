@@ -19,4 +19,4 @@ ADD id_rsa.pub /root/.ssh
 
 RUN cat ~/.ssh/*.pub > /root/.ssh/authorized_keys
 
-CMD /usr/sbin/sshd -De
+CMD /usr/sbin/sshd -De -oLogLevel=DEBUG1

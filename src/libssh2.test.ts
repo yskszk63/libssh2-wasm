@@ -1,4 +1,5 @@
 import { spawn } from "child_process";
+import type { StdioOptions } from "child_process";
 import { fileURLToPath } from "url";
 import fs from "fs/promises";
 import net from "net";
@@ -8,6 +9,8 @@ import path from "path";
 
 import { newLibssh2 } from "./libssh2.js";
 
+const debug = typeof process.env["DEBUG"] !== "undefined";
+
 const crypto = webcrypto as unknown as Crypto;
 
 let container: undefined | {
@@ -15,19 +18,31 @@ let container: undefined | {
   ipaddr: string;
 };
 
-async function docker(args: string[], capture: true): Promise<string>;
-async function docker(args: string[], capture: false): Promise<void>;
-async function docker(args: string[]): Promise<void>;
+async function docker(args: string[], stdio: "capture"): Promise<string>;
 async function docker(
   args: string[],
-  capture: boolean | undefined = false,
+  stdio?: "quiet" | "inherit",
+): Promise<void>;
+async function docker(
+  args: string[],
+  stdio: "capture" | "quiet" | "inherit" = "quiet",
 ): Promise<string | void> {
+  const s = (() => {
+    switch (stdio) {
+      case "capture":
+        return ["ignore", "pipe", "inherit"];
+      case "inherit":
+        return ["ignore", "inherit", "inherit"];
+      case "quiet":
+        return ["ignore", "ignore", "ignore"];
+    }
+  })() as StdioOptions;
   const proc = spawn("docker", args, {
-    stdio: capture ? ["ignore", "pipe", "inherit"] : "ignore",
+    stdio: s,
   });
 
   const buf: string[] = [];
-  if (capture) {
+  if (stdio === "capture") {
     if (!proc.stdout) {
       throw new Error(); // unreachable
     }
@@ -45,7 +60,7 @@ async function docker(
     throw new Error(`failed ${result}: docker ${args.join(" ")}`);
   }
 
-  if (!capture) {
+  if (stdio !== "capture") {
     return;
   }
   return buf.join("").trimEnd();
@@ -54,25 +69,36 @@ async function docker(
 beforeAll(async () => {
   const dir = fileURLToPath(new URL("./libssh2.test/", import.meta.url));
   await docker(["buildx", "build", dir, "-t", "libssh2-test-sshd"]);
-  const name = await docker(["run", "--rm", "-d", "libssh2-test-sshd"], true);
+  const name = await docker(
+    ["run", "--rm", "-d", "libssh2-test-sshd"],
+    "capture",
+  );
   const ipaddr = await docker([
     "inspect",
     "-f",
     "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}",
     name,
-  ], true);
+  ], "capture");
 
   container = {
     id: name,
     ipaddr,
   };
-  console.log("container.id:", container.id, "container.ipaddr:", container.ipaddr);
+  if (debug) {
+    console.log(
+      "container.id:",
+      container.id,
+      "container.ipaddr:",
+      container.ipaddr,
+    );
+  }
 }, 60 * 1000);
 
 afterAll(async () => {
   if (typeof container === "undefined") {
     return;
   }
+  await docker(["logs", container.id], debug ? "inherit" : "quiet");
   await docker(["kill", container.id]);
 });
 
@@ -464,7 +490,7 @@ describe("Session.exec", () => {
             },
           }),
         );
-        expect(chunks.join("")).toBe("hello");
+        expect(chunks.join("")).toContain("hello");
 
         await channel.waitEof();
       } finally {
