@@ -84,6 +84,8 @@ jobs:
 
       - run: docker buildx build src/libssh2.test -t libssh2-test-sshd
 
-      - run: npm test # TODO cov
+      - run: npm test -- --coverage
         env:
           DEBUG: 1
+
+      - uses: codecov/codecov-action@v2
