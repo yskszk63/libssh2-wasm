@@ -3,25 +3,34 @@ import * as sys from "./sys.js";
 import CEnv, { CPtr } from "./cenv.js";
 
 type NewLibssh2Opts = {
-  fetcher: () => Promise<Response | Uint8Array>,
-  netFactory: (host: string, port: number) => Promise<[ReadableStream<Uint8Array>, WritableStream<Uint8Array>]>,
-  crypto: Crypto,
-  ReadableStream: typeof ReadableStream
-  WritableStream: typeof WritableStream
-}
+  fetcher: () => Promise<Response | Uint8Array>;
+  netFactory: (
+    host: string,
+    port: number,
+  ) => Promise<[ReadableStream<Uint8Array>, WritableStream<Uint8Array>]>;
+  crypto: Crypto;
+  ReadableStream: typeof ReadableStream;
+  WritableStream: typeof WritableStream;
+};
 
 export type ConnectOpts = {
-  host: string
-  port?: number
-  knownhost: string
-  username: string
-  privatekey: () => Promise<Uint8Array>
-}
+  host: string;
+  port?: number;
+  knownhost: string;
+  username: string;
+  privatekey: () => Promise<Uint8Array>;
+};
 
-async function instantiate(fetcher: Promise<Response | Uint8Array>, imports: WebAssembly.Imports): Promise<WebAssembly.Instance> {
+async function instantiate(
+  fetcher: Promise<Response | Uint8Array>,
+  imports: WebAssembly.Imports,
+): Promise<WebAssembly.Instance> {
   const source = await fetcher;
   if (!(source instanceof Uint8Array)) {
-    const { instance } = await WebAssembly.instantiateStreaming(source, imports);
+    const { instance } = await WebAssembly.instantiateStreaming(
+      source,
+      imports,
+    );
     return instance;
   }
 
@@ -29,7 +38,10 @@ async function instantiate(fetcher: Promise<Response | Uint8Array>, imports: Web
   return instance;
 }
 
-export async function newLibssh2({ fetcher, netFactory, crypto, ReadableStream, WritableStream }: NewLibssh2Opts): Promise<Libssh2> {
+export async function newLibssh2(
+  { fetcher, netFactory, crypto, ReadableStream, WritableStream }:
+    NewLibssh2Opts,
+): Promise<Libssh2> {
   const wasi = new Wasi({ netFactory, crypto });
   const instance = await instantiate(fetcher(), {
     "env": {
@@ -57,14 +69,22 @@ export async function newLibssh2({ fetcher, netFactory, crypto, ReadableStream, 
 }
 
 class Libssh2 {
-  #exports: sys.WasiExports & sys.CExports & sys.Libssh2Exports
-  #wasi: Wasi
-  #cenv: CEnv
-  #ReadableStream: typeof ReadableStream
-  #WritableStream: typeof WritableStream
+  #exports: sys.WasiExports & sys.CExports & sys.Libssh2Exports;
+  #wasi: Wasi;
+  #cenv: CEnv;
+  #ReadableStream: typeof ReadableStream;
+  #WritableStream: typeof WritableStream;
 
-  constructor(exports: WebAssembly.Exports, wasi: Wasi, _ReadableStream: typeof ReadableStream, _WritableStream: typeof WritableStream) {
-    if (!sys.isWasiExports(exports) || !sys.isCExports(exports) || !sys.isLibssh2Exports(exports)) {
+  constructor(
+    exports: WebAssembly.Exports,
+    wasi: Wasi,
+    _ReadableStream: typeof ReadableStream,
+    _WritableStream: typeof WritableStream,
+  ) {
+    if (
+      !sys.isWasiExports(exports) || !sys.isCExports(exports) ||
+      !sys.isLibssh2Exports(exports)
+    ) {
       throw new TypeError("Missing exported function");
     }
     this.#exports = exports;
@@ -99,7 +119,9 @@ class Libssh2 {
     return this.#wasi.poll(fds);
   }
 
-  async connect({ host, port=22, knownhost, username, privatekey }: ConnectOpts): Promise<Session> {
+  async connect(
+    { host, port = 22, knownhost, username, privatekey }: ConnectOpts,
+  ): Promise<Session> {
     const fd = this.#cenv.with([`/dev/tcp/${host}:${port}`], (path) => {
       // TODO flags
       return this.#cenv.ccall(this.#exports.open, path.ptr, 0x0400_0000);
@@ -119,11 +141,10 @@ class Libssh2 {
         if (typeof ktype === "undefined") {
           throw new Error("failed to get key type.");
         }
-        result.methodPref(1/*LIBSSH2_METHOD_HOSTKEY*/, ktype);
+        result.methodPref(1, /*LIBSSH2_METHOD_HOSTKEY*/ ktype);
 
         const hostkey = await result.handshake();
         hosts.checkp(host, port, hostkey);
-
       } finally {
         hosts.free();
       }
@@ -132,7 +153,6 @@ class Libssh2 {
         await result.userauthPublickeyFrommemory(username, privatekey);
       }
       return result;
-
     } catch (e) {
       this.#cenv.ccall(this.#exports.close, fd);
       throw e;
@@ -145,9 +165,9 @@ class Libssh2 {
 }
 
 class Session {
-  #libssh2: Libssh2
-  #_session: number | null
-  #_fd: number | null
+  #libssh2: Libssh2;
+  #_session: number | null;
+  #_fd: number | null;
 
   constructor(libssh2: Libssh2, session: number, fd: number) {
     this.#libssh2 = libssh2;
@@ -181,35 +201,63 @@ class Session {
     return this.#_fd;
   }
 
-  async nbcall<A extends unknown[], F extends (...args: A) => number>(fn: F, ...args: A): Promise<number> {
+  async nbcall<A extends unknown[], F extends (...args: A) => number>(
+    fn: F,
+    ...args: A
+  ): Promise<number> {
     while (true) {
       const ret = fn(...args);
       if (ret === 0) {
         return ret;
       }
-      if (ret !== -37/*LIBSSH2_ERROR_EAGAIN*/) {
-        return this.#cenv.with([this.#cenv.malloc(4), this.#cenv.malloc(4)], (ptr, len) => {
-          this.#exports.libssh2_session_last_error(this.#session, ptr.ptr, len.ptr, 0);
-          const buf = this.#cenv.ref(this.#cenv.u32(ptr), this.#cenv.u32(len));
-          throw new Error(`${ret}: ${this.#cenv.str(buf)}`);
-        });
+      if (ret !== -37 /*LIBSSH2_ERROR_EAGAIN*/) {
+        return this.#cenv.with(
+          [this.#cenv.malloc(4), this.#cenv.malloc(4)],
+          (ptr, len) => {
+            this.#exports.libssh2_session_last_error(
+              this.#session,
+              ptr.ptr,
+              len.ptr,
+              0,
+            );
+            const buf = this.#cenv.ref(
+              this.#cenv.u32(ptr),
+              this.#cenv.u32(len),
+            );
+            throw new Error(`${ret}: ${this.#cenv.str(buf)}`);
+          },
+        );
       }
       await this.#poll();
     }
   }
 
-  async nbcallio<A extends unknown[], F extends (...args: A) => number>(fn: F, ...args: A): Promise<number> {
+  async nbcallio<A extends unknown[], F extends (...args: A) => number>(
+    fn: F,
+    ...args: A
+  ): Promise<number> {
     while (true) {
       const ret = fn(...args);
       if (ret >= 0) {
         return ret;
       }
-      if (ret !== -37/*LIBSSH2_ERROR_EAGAIN*/) {
-        this.#cenv.with([this.#cenv.malloc(4), this.#cenv.malloc(4)], (ptr, len) => {
-          this.#exports.libssh2_session_last_error(this.#session, ptr.ptr, len.ptr, 0);
-          const buf = this.#cenv.ref(this.#cenv.u32(ptr), this.#cenv.u32(len));
-          throw new Error(`${ret}: ${this.#cenv.str(buf)}`);
-        });
+      if (ret !== -37 /*LIBSSH2_ERROR_EAGAIN*/) {
+        this.#cenv.with(
+          [this.#cenv.malloc(4), this.#cenv.malloc(4)],
+          (ptr, len) => {
+            this.#exports.libssh2_session_last_error(
+              this.#session,
+              ptr.ptr,
+              len.ptr,
+              0,
+            );
+            const buf = this.#cenv.ref(
+              this.#cenv.u32(ptr),
+              this.#cenv.u32(len),
+            );
+            throw new Error(`${ret}: ${this.#cenv.str(buf)}`);
+          },
+        );
       }
       await this.#poll();
     }
@@ -224,9 +272,17 @@ class Session {
   }
 
   async handshake(): Promise<CPtr> {
-    await this.nbcall(this.#exports.libssh2_session_handshake, this.#session, this.#fd);
+    await this.nbcall(
+      this.#exports.libssh2_session_handshake,
+      this.#session,
+      this.#fd,
+    );
     return this.#cenv.with([this.#cenv.malloc(4)], (len) => {
-      const r = this.#exports.libssh2_session_hostkey(this.#session, len.ptr, 0);
+      const r = this.#exports.libssh2_session_hostkey(
+        this.#session,
+        len.ptr,
+        0,
+      );
       if (r === 0) {
         throw new Error("failed to get hostkey");
       }
@@ -238,23 +294,30 @@ class Session {
     return this.#exports.libssh2_userauth_authenticated(this.#session) !== 0;
   }
 
-  async userauthPublickeyFrommemory(username: string, privatekey: () => Promise<Uint8Array>): Promise<void> {
+  async userauthPublickeyFrommemory(
+    username: string,
+    privatekey: () => Promise<Uint8Array>,
+  ): Promise<void> {
     const key = await privatekey();
-    return this.#cenv.with([username, this.#cenv.copy(key)], (username, key) => {
-      if (username.len === null || key.len === null) {
-        throw new Error();
-      }
-      return this.nbcall(
-        this.#exports.libssh2_userauth_publickey_frommemory,
-        this.#session,
-        username.ptr,
-        username.len - 1,
-        0,
-        0,
-        key.ptr,
-        key.len,
-        0);
-    }).then(() => void 0);
+    return this.#cenv.with(
+      [username, this.#cenv.copy(key)],
+      (username, key) => {
+        if (username.len === null || key.len === null) {
+          throw new Error();
+        }
+        return this.nbcall(
+          this.#exports.libssh2_userauth_publickey_frommemory,
+          this.#session,
+          username.ptr,
+          username.len - 1,
+          0,
+          0,
+          key.ptr,
+          key.len,
+          0,
+        );
+      },
+    ).then(() => void 0);
   }
 
   methodPref(methodType: number, prefs: string) {
@@ -265,11 +328,22 @@ class Session {
         prefs.ptr,
       );
       if (result !== 0) {
-        this.#cenv.with([this.#cenv.malloc(4), this.#cenv.malloc(4)], (ptr, len) => {
-          this.#exports.libssh2_session_last_error(this.#session, ptr.ptr, len.ptr, 0);
-          const buf = this.#cenv.ref(this.#cenv.u32(ptr), this.#cenv.u32(len));
-          throw new Error(this.#cenv.str(buf));
-        });
+        this.#cenv.with(
+          [this.#cenv.malloc(4), this.#cenv.malloc(4)],
+          (ptr, len) => {
+            this.#exports.libssh2_session_last_error(
+              this.#session,
+              ptr.ptr,
+              len.ptr,
+              0,
+            );
+            const buf = this.#cenv.ref(
+              this.#cenv.u32(ptr),
+              this.#cenv.u32(len),
+            );
+            throw new Error(this.#cenv.str(buf));
+          },
+        );
       }
     });
   }
@@ -284,7 +358,7 @@ class Session {
           this.#session,
           channeltype.ptr,
           channeltype.len - 1,
-          (2*1024*1024), // LIBSSH2_CHANNEL_WINDOW_DEFAULT
+          2 * 1024 * 1024, // LIBSSH2_CHANNEL_WINDOW_DEFAULT
           32768, // LIBSSH2_CHANNEL_PACKET_DEFAULT
           0,
           0,
@@ -292,12 +366,26 @@ class Session {
         if (ret > 0) {
           return new SessionChannel(this.#libssh2, this, ret);
         }
-        if (this.#exports.libssh2_session_last_errno(this.#session) !== -37/*LIBSSH2_ERROR_EAGAIN*/) {
-          this.#cenv.with([this.#cenv.malloc(4), this.#cenv.malloc(4)], (ptr, len) => {
-            this.#exports.libssh2_session_last_error(this.#session, ptr.ptr, len.ptr, 0);
-            const buf = this.#cenv.ref(this.#cenv.u32(ptr), this.#cenv.u32(len));
-            throw new Error(this.#cenv.str(buf));
-          });
+        if (
+          this.#exports.libssh2_session_last_errno(this.#session) !==
+            -37 /*LIBSSH2_ERROR_EAGAIN*/
+        ) {
+          this.#cenv.with(
+            [this.#cenv.malloc(4), this.#cenv.malloc(4)],
+            (ptr, len) => {
+              this.#exports.libssh2_session_last_error(
+                this.#session,
+                ptr.ptr,
+                len.ptr,
+                0,
+              );
+              const buf = this.#cenv.ref(
+                this.#cenv.u32(ptr),
+                this.#cenv.u32(len),
+              );
+              throw new Error(this.#cenv.str(buf));
+            },
+          );
         }
         await this.#poll();
       }
@@ -334,8 +422,8 @@ class Session {
 }
 
 class Knownhost {
-  #libssh2: Libssh2
-  #_hosts: number | null
+  #libssh2: Libssh2;
+  #_hosts: number | null;
 
   constructor(libssh2: Libssh2, hosts: number) {
     this.#libssh2 = libssh2;
@@ -359,7 +447,12 @@ class Knownhost {
 
   readline(line: string) {
     this.#cenv.with([line], (line) => {
-      const r = this.#exports.libssh2_knownhost_readline(this.#hosts, line.ptr, line.len ?? 0, 1/*LIBSSH2_KNOWNHOST_FILE_OPENSSH*/);
+      const r = this.#exports.libssh2_knownhost_readline(
+        this.#hosts,
+        line.ptr,
+        line.len ?? 0,
+        1, /*LIBSSH2_KNOWNHOST_FILE_OPENSSH*/
+      );
       if (r) {
         throw new Error();
       }
@@ -368,22 +461,33 @@ class Knownhost {
 
   checkp(host: string, port: number, key: CPtr) {
     this.#cenv.with([host], (host) => {
-      const typemask =
-        1 /*LIBSSH2_KNOWNHOST_TYPE_PLAIN*/
-      | (1<<16)/*LIBSSH2_KNOWNHOST_KEYENC_RAW*/
+      const typemask = 1 | /*LIBSSH2_KNOWNHOST_TYPE_PLAIN*/
+        (1 << 16); /*LIBSSH2_KNOWNHOST_KEYENC_RAW*/
       if (key.len === null) {
         throw new TypeError();
       }
-      const r = this.#exports.libssh2_knownhost_checkp(this.#hosts, host.ptr, port, key.ptr, key.len, typemask, 0);
+      const r = this.#exports.libssh2_knownhost_checkp(
+        this.#hosts,
+        host.ptr,
+        port,
+        key.ptr,
+        key.len,
+        typemask,
+        0,
+      );
       switch (r) {
-      // LIBSSH2_KNOWNHOST_CHECK_FAILURE 3
-        case 3: throw new Error("Knownhost key check failure");
-      // LIBSSH2_KNOWNHOST_CHECK_NOTFOUND 2
-        case 2: throw new Error("Knownhost key check notfound");
-      // LIBSSH2_KNOWNHOST_CHECK_MATCH 0
-        case 0: return;
-      // LIBSSH2_KNOWNHOST_CHECK_MISMATCH 1
-        case 1: throw new Error("Knownhost key check mismatch");
+        // LIBSSH2_KNOWNHOST_CHECK_FAILURE 3
+        case 3:
+          throw new Error("Knownhost key check failure");
+        // LIBSSH2_KNOWNHOST_CHECK_NOTFOUND 2
+        case 2:
+          throw new Error("Knownhost key check notfound");
+        // LIBSSH2_KNOWNHOST_CHECK_MATCH 0
+        case 0:
+          return;
+        // LIBSSH2_KNOWNHOST_CHECK_MISMATCH 1
+        case 1:
+          throw new Error("Knownhost key check mismatch");
       }
     });
   }
@@ -395,12 +499,12 @@ class Knownhost {
 }
 
 class SessionChannel {
-  #libssh2: Libssh2
-  #session: Session
-  #_channel: number | null
-  #stdin: WritableStream<Uint8Array>
-  #stdout: ReadableStream<Uint8Array>
-  #stderr: ReadableStream<Uint8Array>
+  #libssh2: Libssh2;
+  #session: Session;
+  #_channel: number | null;
+  #stdin: WritableStream<Uint8Array>;
+  #stdout: ReadableStream<Uint8Array>;
+  #stderr: ReadableStream<Uint8Array>;
 
   constructor(libssh2: Libssh2, session: Session, channel: number) {
     this.#libssh2 = libssh2;
@@ -530,10 +634,12 @@ class SessionChannel {
       await this.#session.nbcall(
         this.#exports.libssh2_channel_process_startup,
         this.#channel,
-        request.ptr, request.len - 1,
-        message.ptr, message.len - 1,
+        request.ptr,
+        request.len - 1,
+        message.ptr,
+        message.len - 1,
       );
-    })
+    });
   }
 
   get status(): number {

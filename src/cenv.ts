@@ -1,10 +1,10 @@
 import type { CExports, WasiExports } from "./sys.js";
 
 export class CPtr {
-  #env: CEnv
-  #ptr: number | null
-  #len: number | null
-  #owned: boolean
+  #env: CEnv;
+  #ptr: number | null;
+  #len: number | null;
+  #owned: boolean;
 
   constructor(env: CEnv, ptr: number, len: number | null, owned: boolean) {
     this.#env = env;
@@ -42,7 +42,7 @@ export class CPtr {
 }
 
 export default class CEnv {
-  #exports: CExports & WasiExports
+  #exports: CExports & WasiExports;
 
   constructor(exports: CExports & WasiExports) {
     this.#exports = exports;
@@ -124,7 +124,10 @@ export default class CEnv {
     return new CPtr(this, off, len, false);
   }
 
-  with<A extends CPtr[], F extends (...ptrs: A) => unknown>(ss: MapToStrOrCPtr<A>, fn: F): ReturnType<F> {
+  with<A extends CPtr[], F extends (...ptrs: A) => unknown>(
+    ss: MapToStrOrCPtr<A>,
+    fn: F,
+  ): ReturnType<F> {
     const allocs: CPtr[] = [];
     function free() {
       for (const ptr of allocs) {
@@ -145,8 +148,7 @@ export default class CEnv {
         }
       }
       r = fn(...allocs as A) as ReturnType<F>;
-
-    } catch(e) {
+    } catch (e) {
       free();
       throw e;
     }
@@ -158,7 +160,10 @@ export default class CEnv {
     return r;
   }
 
-  ccall<A extends unknown[], F extends (...args: A) => number>(fn: F, ...args: A): number {
+  ccall<A extends unknown[], F extends (...args: A) => number>(
+    fn: F,
+    ...args: A
+  ): number {
     const r = fn(...args);
     if (r < 0) {
       const errnum = this.errno;
@@ -169,4 +174,6 @@ export default class CEnv {
   }
 }
 
-type MapToStrOrCPtr<T extends Array<CPtr | string>> = { [P in keyof T]: CPtr | string } & Array<CPtr | string>;
+type MapToStrOrCPtr<T extends Array<CPtr | string>> =
+  & { [P in keyof T]: CPtr | string }
+  & Array<CPtr | string>;

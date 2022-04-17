@@ -2,19 +2,30 @@
 // - No type definition in lib.dom.d.ts
 // - Intersections in node and dom type definitions
 interface ReadableStreamBYOBReader {
-  read(view: Uint8Array): Promise<{ value: Uint8Array, done: false } | { value: undefined, done: true }>
+  read(
+    view: Uint8Array,
+  ): Promise<
+    { value: Uint8Array; done: false } | { value: undefined; done: true }
+  >;
   releaseLock(): void;
 }
 
 interface ReadableStream<R> {
-  getReader(opts: { mode: "byob" }): ReadableStreamBYOBReader
+  getReader(opts: { mode: "byob" }): ReadableStreamBYOBReader;
   tee(): [ReadableStream<R>, ReadableStream<R>];
   cancel(reason?: unknown): Promise<void>;
 }
 
 declare global {
   interface Atomics {
-    waitAsync(typedArray: Int32Array, index: number, value: number): { async: false, value: "not-equal" | "timed-out"} | { async: true, value: Promise<"ok" | "timed-out"> }
+    waitAsync(
+      typedArray: Int32Array,
+      index: number,
+      value: number,
+    ): { async: false; value: "not-equal" | "timed-out" } | {
+      async: true;
+      value: Promise<"ok" | "timed-out">;
+    };
   }
 }
 
@@ -34,14 +45,14 @@ const FILETYPE_SOCKET_STREAM = 6;
 const FILETYPE_SYMBOLIC_LINK = 7;
 
 type Filetype =
-| typeof FILETYPE_UNKNOWN
-| typeof FILETYPE_BLOCK_DEVICE
-| typeof FILETYPE_CHARACTER_DEVICE
-| typeof FILETYPE_DIRECTORY
-| typeof FILETYPE_REGULAR
-| typeof FILETYPE_SOCKET_DGRAM
-| typeof FILETYPE_SOCKET_STREAM
-| typeof FILETYPE_SYMBOLIC_LINK
+  | typeof FILETYPE_UNKNOWN
+  | typeof FILETYPE_BLOCK_DEVICE
+  | typeof FILETYPE_CHARACTER_DEVICE
+  | typeof FILETYPE_DIRECTORY
+  | typeof FILETYPE_REGULAR
+  | typeof FILETYPE_SOCKET_DGRAM
+  | typeof FILETYPE_SOCKET_STREAM
+  | typeof FILETYPE_SYMBOLIC_LINK;
 
 const FDFLAGS_APPEND = 1 << 0;
 const FDFLAGS_DSYNC = 1 << 1;
@@ -50,11 +61,11 @@ const FDFLAGS_RSYNC = 1 << 3;
 const FDFLAGS_SYNC = 1 << 4;
 
 type Fdflag =
-| typeof FDFLAGS_APPEND
-| typeof FDFLAGS_DSYNC
-| typeof FDFLAGS_NONBLOCK
-| typeof FDFLAGS_RSYNC
-| typeof FDFLAGS_SYNC
+  | typeof FDFLAGS_APPEND
+  | typeof FDFLAGS_DSYNC
+  | typeof FDFLAGS_NONBLOCK
+  | typeof FDFLAGS_RSYNC
+  | typeof FDFLAGS_SYNC;
 
 const RIGHT_FD_DATASYNC = 1n << 0n;
 const RIGHT_FD_READ = 1n << 1n;
@@ -88,113 +99,112 @@ const RIGHT_SOCK_SHUTDOWN = 1n << 28n;
 const RIGHT_SOCK_ACCEPT = 1n << 29n;
 
 type Right =
-| typeof RIGHT_FD_DATASYNC
-| typeof RIGHT_FD_READ
-| typeof RIGHT_FD_SEEK
-| typeof RIGHT_FD_FDSTAT_SET_FLAGS
-| typeof RIGHT_FD_SYNC
-| typeof RIGHT_FD_TELL
-| typeof RIGHT_FD_WRITE
-| typeof RIGHT_FD_ADVICE
-| typeof RIGHT_FD_ALLOCATE
-| typeof RIGHT_PATH_CRATE_DIRECTORY
-| typeof RIGHT_PATH_CREATE_FILE
-| typeof RIGHT_PATH_LINK_SOURCE
-| typeof RIGHT_PATH_LINK_TARGET
-| typeof RIGHT_PATH_OPEN
-| typeof RIGHT_FD_READDIR
-| typeof RIGHT_PATH_READLINK
-| typeof RIGHT_PATH_RENAME_SOURCE
-| typeof RIGHT_PATH_RENAME_TARGET
-| typeof RIGHT_PATH_FILESTAT_GET
-| typeof RIGHT_PATH_FILESTAT_SET_SIZE
-| typeof RIGHT_PATH_FILESTAT_SET_TIMES
-| typeof RIGHT_FD_FILESTAT_GET
-| typeof RIGHT_FD_FILESTAT_SET_SIZE
-| typeof RIGHT_FD_FILESTAT_SET_TIMES
-| typeof RIGHT_PATH_LINK
-| typeof RIGHT_PATH_REMOVE_DIRECTORY
-| typeof RIGHT_PATH_UNLINK_FILE
-| typeof RIGHT_FD_READWRITE
-| typeof RIGHT_SOCK_SHUTDOWN
-| typeof RIGHT_SOCK_ACCEPT
-
+  | typeof RIGHT_FD_DATASYNC
+  | typeof RIGHT_FD_READ
+  | typeof RIGHT_FD_SEEK
+  | typeof RIGHT_FD_FDSTAT_SET_FLAGS
+  | typeof RIGHT_FD_SYNC
+  | typeof RIGHT_FD_TELL
+  | typeof RIGHT_FD_WRITE
+  | typeof RIGHT_FD_ADVICE
+  | typeof RIGHT_FD_ALLOCATE
+  | typeof RIGHT_PATH_CRATE_DIRECTORY
+  | typeof RIGHT_PATH_CREATE_FILE
+  | typeof RIGHT_PATH_LINK_SOURCE
+  | typeof RIGHT_PATH_LINK_TARGET
+  | typeof RIGHT_PATH_OPEN
+  | typeof RIGHT_FD_READDIR
+  | typeof RIGHT_PATH_READLINK
+  | typeof RIGHT_PATH_RENAME_SOURCE
+  | typeof RIGHT_PATH_RENAME_TARGET
+  | typeof RIGHT_PATH_FILESTAT_GET
+  | typeof RIGHT_PATH_FILESTAT_SET_SIZE
+  | typeof RIGHT_PATH_FILESTAT_SET_TIMES
+  | typeof RIGHT_FD_FILESTAT_GET
+  | typeof RIGHT_FD_FILESTAT_SET_SIZE
+  | typeof RIGHT_FD_FILESTAT_SET_TIMES
+  | typeof RIGHT_PATH_LINK
+  | typeof RIGHT_PATH_REMOVE_DIRECTORY
+  | typeof RIGHT_PATH_UNLINK_FILE
+  | typeof RIGHT_FD_READWRITE
+  | typeof RIGHT_SOCK_SHUTDOWN
+  | typeof RIGHT_SOCK_ACCEPT;
 
 type Fdstat = {
-  fs_filetype: Filetype
-  fs_flags: Set<Fdflag>
-  fs_rights_base: Set<Right>
-  fs_rights_inheriting: Set<Right>
-}
+  fs_filetype: Filetype;
+  fs_flags: Set<Fdflag>;
+  fs_rights_base: Set<Right>;
+  fs_rights_inheriting: Set<Right>;
+};
 
 type ReadContext = {
-  state: "connecting",
+  state: "connecting";
 } | {
-  state: "idle",
-  buf: Uint8Array,
-  stream: ReadableStream<Uint8Array>,
-  reader: ReadableStreamBYOBReader,
+  state: "idle";
+  buf: Uint8Array;
+  stream: ReadableStream<Uint8Array>;
+  reader: ReadableStreamBYOBReader;
 } | {
-  state: "reading",
-  stream: ReadableStream<Uint8Array>,
-  reader: ReadableStreamBYOBReader,
+  state: "reading";
+  stream: ReadableStream<Uint8Array>;
+  reader: ReadableStreamBYOBReader;
 } | {
-  state: "eof",
-  stream: ReadableStream<Uint8Array>,
+  state: "eof";
+  stream: ReadableStream<Uint8Array>;
 } | {
-  state: "closed",
+  state: "closed";
 } | {
-  state: "error",
-  error: unknown,
-}
+  state: "error";
+  error: unknown;
+};
 
 type WriteContext = {
-  state: "connecting",
+  state: "connecting";
 } | {
-  state: "idle",
-  buf: Uint8Array
-  stream: WritableStream<Uint8Array>,
-  writer: WritableStreamDefaultWriter<Uint8Array>
+  state: "idle";
+  buf: Uint8Array;
+  stream: WritableStream<Uint8Array>;
+  writer: WritableStreamDefaultWriter<Uint8Array>;
 } | {
-  state: "writing",
-  stream: WritableStream<Uint8Array>,
-  writer: WritableStreamDefaultWriter<Uint8Array>
+  state: "writing";
+  stream: WritableStream<Uint8Array>;
+  writer: WritableStreamDefaultWriter<Uint8Array>;
 } | {
-  state: "wrote",
-  len: number,
-  buf: Uint8Array
-  stream: WritableStream<Uint8Array>,
-  writer: WritableStreamDefaultWriter<Uint8Array>
+  state: "wrote";
+  len: number;
+  buf: Uint8Array;
+  stream: WritableStream<Uint8Array>;
+  writer: WritableStreamDefaultWriter<Uint8Array>;
 } | {
-  state: "closed"
+  state: "closed";
 } | {
-  state: "error"
-  error: unknown,
-}
+  state: "error";
+  error: unknown;
+};
 
 type SockFd = {
-  type: "socket"
-  stat: Fdstat
-  rcx: ReadContext
-  wcx: WriteContext
-  sig: Int32Array // for Atomics.notify / waitAsync
-}
+  type: "socket";
+  stat: Fdstat;
+  rcx: ReadContext;
+  wcx: WriteContext;
+  sig: Int32Array; // for Atomics.notify / waitAsync
+};
 
 type DirFd = {
-  type: "dir"
-  name: string
-  stat: Fdstat
-}
+  type: "dir";
+  name: string;
+  stat: Fdstat;
+};
 
 type DevUrandomFd = {
-  type: "urandom"
-  stat: Fdstat
-}
+  type: "urandom";
+  stat: Fdstat;
+};
 
-type Filedescriptor = DirFd | DevUrandomFd | SockFd
+type Filedescriptor = DirFd | DevUrandomFd | SockFd;
 
 class SubscriptionClock {
-  #view: DataView
+  #view: DataView;
   constructor(view: DataView, offset: number) {
     this.#view = new DataView(view.buffer, view.byteOffset + offset);
   }
@@ -217,7 +227,7 @@ class SubscriptionClock {
 }
 
 class SubscriptionFdReadWrite {
-  #view: DataView
+  #view: DataView;
   constructor(view: DataView, offset: number) {
     this.#view = new DataView(view.buffer, view.byteOffset + offset);
   }
@@ -232,15 +242,23 @@ const SUBSCRIPTION_U_TAG_FD_READ = 1;
 const SUBSCRIPTION_U_TAG_FD_WRITE = 2;
 
 class SubscriptionU {
-  #view: DataView
+  #view: DataView;
   constructor(view: DataView, offset: number) {
     this.#view = new DataView(view.buffer, view.byteOffset + offset);
   }
 
-  get val(): [typeof SUBSCRIPTION_U_TAG_CLOCK, SubscriptionClock] | [typeof SUBSCRIPTION_U_TAG_FD_READ | typeof SUBSCRIPTION_U_TAG_FD_WRITE, SubscriptionFdReadWrite] {
+  get val(): [typeof SUBSCRIPTION_U_TAG_CLOCK, SubscriptionClock] | [
+    typeof SUBSCRIPTION_U_TAG_FD_READ | typeof SUBSCRIPTION_U_TAG_FD_WRITE,
+    SubscriptionFdReadWrite,
+  ] {
     const t = this.#view.getUint8(0);
-    if (t !== SUBSCRIPTION_U_TAG_CLOCK && t !== SUBSCRIPTION_U_TAG_FD_READ && t !== SUBSCRIPTION_U_TAG_FD_WRITE) {
-      throw new Error(`${t} not in [SUBSCRIPTION_U_TAG_CLOCK, SUBSCRIPTION_U_TAG_FD_READ, SUBSCRIPTION_U_TAG_FD_WRITE]`);
+    if (
+      t !== SUBSCRIPTION_U_TAG_CLOCK && t !== SUBSCRIPTION_U_TAG_FD_READ &&
+      t !== SUBSCRIPTION_U_TAG_FD_WRITE
+    ) {
+      throw new Error(
+        `${t} not in [SUBSCRIPTION_U_TAG_CLOCK, SUBSCRIPTION_U_TAG_FD_READ, SUBSCRIPTION_U_TAG_FD_WRITE]`,
+      );
     }
     switch (t) {
       case SUBSCRIPTION_U_TAG_CLOCK:
@@ -256,7 +274,7 @@ class SubscriptionU {
 }
 
 class Subscription {
-  #view: DataView
+  #view: DataView;
   constructor(view: DataView, offset: number) {
     this.#view = new DataView(view.buffer, view.byteOffset + offset);
   }
@@ -277,19 +295,19 @@ const EVENTTYPE_FD_WRITE = 2;
 type Eventtype =
   | typeof EVENTTYPE_CLOCK
   | typeof EVENTTYPE_FD_READ
-  | typeof EVENTTYPE_FD_WRITE
+  | typeof EVENTTYPE_FD_WRITE;
 
 const EVENTRWFLAGS_FD_READWRITE_HANGUP = 1 << 0;
-type Eventrwflags = typeof EVENTRWFLAGS_FD_READWRITE_HANGUP
+type Eventrwflags = typeof EVENTRWFLAGS_FD_READWRITE_HANGUP;
 
 type EventFdReadwrite = {
-  nbytes: bigint
-  flags: Eventrwflags[]
-}
+  nbytes: bigint;
+  flags: Eventrwflags[];
+};
 
 class Event {
-  #view: DataView
-  constructor(view :DataView, offset: number) {
+  #view: DataView;
+  constructor(view: DataView, offset: number) {
     this.#view = new DataView(view.buffer, view.byteOffset + offset);
   }
 
@@ -302,7 +320,7 @@ class Event {
   }
 
   set type(v: Eventtype) {
-    this.#view.setUint8(10, v)
+    this.#view.setUint8(10, v);
   }
 
   set fd_readwrite(v: EventFdReadwrite) {
@@ -312,8 +330,8 @@ class Event {
 }
 
 class Iovec {
-  #view: DataView
-  constructor(view :DataView, offset: number) {
+  #view: DataView;
+  constructor(view: DataView, offset: number) {
     this.#view = new DataView(view.buffer, view.byteOffset + offset);
   }
 
@@ -325,8 +343,8 @@ class Iovec {
 }
 
 class Ciovec {
-  #view: DataView
-  constructor(view :DataView, offset: number) {
+  #view: DataView;
+  constructor(view: DataView, offset: number) {
     this.#view = new DataView(view.buffer, view.byteOffset + offset);
   }
 
@@ -341,14 +359,17 @@ const FD_DEV = 3;
 const FD_TCP = 4;
 
 type WasiConstructorOpts = {
-  netFactory: (host: string, port: number) => Promise<[ReadableStream<Uint8Array>, WritableStream<Uint8Array>]>,
-  crypto: Crypto,
-  logger?: (...args: unknown[]) => void,
-}
+  netFactory: (
+    host: string,
+    port: number,
+  ) => Promise<[ReadableStream<Uint8Array>, WritableStream<Uint8Array>]>;
+  crypto: Crypto;
+  logger?: (...args: unknown[]) => void;
+};
 
 export default class Wasi {
-  #_memory: WebAssembly.Memory | undefined
-  #fds: Record<number, Filedescriptor>
+  #_memory: WebAssembly.Memory | undefined;
+  #fds: Record<number, Filedescriptor>;
   /**
    * 0 .. stdin
    * 1 .. stdout
@@ -356,10 +377,13 @@ export default class Wasi {
    * 3 .. /dev
    * 4 .. /dev/tcp
    */
-  #nextfd: number
-  #netFactory: (host: string, port: number) => Promise<[ReadableStream<Uint8Array>, WritableStream<Uint8Array>]>
-  #crypto: Crypto
-  #logger: (...args: unknown[]) => void
+  #nextfd: number;
+  #netFactory: (
+    host: string,
+    port: number,
+  ) => Promise<[ReadableStream<Uint8Array>, WritableStream<Uint8Array>]>;
+  #crypto: Crypto;
+  #logger: (...args: unknown[]) => void;
 
   constructor({ netFactory, crypto, logger }: WasiConstructorOpts) {
     this.#fds = {
@@ -391,8 +415,8 @@ export default class Wasi {
   }
 
   initialize(instance: WebAssembly.Instance) {
-    const memory = instance.exports['memory'];
-    const _initialize = instance.exports['_initialize'];
+    const memory = instance.exports["memory"];
+    const _initialize = instance.exports["_initialize"];
     if (!(memory instanceof WebAssembly.Memory)) {
       throw new Error(`!${memory} instanceof WebAssembly.Memory`);
     }
@@ -481,9 +505,21 @@ export default class Wasi {
 
     const view = this.#memview;
     view.setUint8(result + 0, stat.fs_filetype);
-    view.setUint16(result + 2, Array.from(stat.fs_flags).reduce((l, r) => l | r, 0), true);
-    view.setBigUint64(result + 8, Array.from(stat.fs_rights_base).reduce((l, r) => l | r, 0n), true);
-    view.setBigUint64(result + 16, Array.from(stat.fs_rights_inheriting).reduce((l, r) => l | r, 0n), true);
+    view.setUint16(
+      result + 2,
+      Array.from(stat.fs_flags).reduce((l, r) => l | r, 0),
+      true,
+    );
+    view.setBigUint64(
+      result + 8,
+      Array.from(stat.fs_rights_base).reduce((l, r) => l | r, 0n),
+      true,
+    );
+    view.setBigUint64(
+      result + 16,
+      Array.from(stat.fs_rights_inheriting).reduce((l, r) => l | r, 0n),
+      true,
+    );
     return 0;
   }
 
@@ -513,7 +549,8 @@ export default class Wasi {
       case "urandom": {
         let r = 0;
         for (let i = 0; i < iovs_len; i++) {
-          const buf = new Iovec(this.#memview, iovs + (i * 8/*sizeof iovec*/)).buf;
+          const buf =
+            new Iovec(this.#memview, iovs + (i * 8 /*sizeof iovec*/)).buf;
           this.#crypto.getRandomValues(buf);
           r += buf.byteLength;
         }
@@ -533,7 +570,7 @@ export default class Wasi {
     fs_rights_base: number,
     fs_rights_inheriting: number,
     fdflags: number,
-    result: number
+    result: number,
   ): number {
     if (oflags || fdflags || fs_rights_base || fs_rights_inheriting) {
       throw new Error("not implemented");
@@ -545,7 +582,9 @@ export default class Wasi {
       return EINVAL;
     }
 
-    const name = new TextDecoder().decode(new Uint8Array(this.#memory, path, path_len));
+    const name = new TextDecoder().decode(
+      new Uint8Array(this.#memory, path, path_len),
+    );
     const fullname = [parent.name, name].join("/");
     const [dir, last] = fullname.split(/\/(?=[^/]*$)/, 2);
     if (!dir || !last) {
@@ -562,8 +601,8 @@ export default class Wasi {
               fs_flags: new Set(),
               fs_rights_base: new Set([RIGHT_FD_READ]),
               fs_rights_inheriting: new Set([]),
-            }
-          }
+            },
+          };
           this.#memview.setUint32(result, nextfd, true);
           return 0;
         }
@@ -595,8 +634,10 @@ export default class Wasi {
           wcx: {
             state: "connecting",
           },
-          sig: new Int32Array(new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT * 2)),
-        }
+          sig: new Int32Array(
+            new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT * 2),
+          ),
+        };
         factory(host, Number(port)).then(([r, w]) => {
           if (fd.rcx.state === "closed" || fd.wcx.state === "closed") {
             r.cancel().catch(this.#logger);
@@ -609,14 +650,14 @@ export default class Wasi {
             buf: new Uint8Array(new ArrayBuffer(1024 * 8), 0, 0),
             stream: r,
             reader: r.getReader({ mode: "byob" }),
-          }
+          };
 
           fd.wcx = {
             state: "idle",
             buf: new Uint8Array(new ArrayBuffer(1024 * 8)),
             stream: w,
             writer: w.getWriter(),
-          }
+          };
 
           Atomics.store(fd.sig, 0, 1);
           Atomics.notify(fd.sig, 0);
@@ -650,10 +691,10 @@ export default class Wasi {
         const { rcx, wcx } = fdi;
         fdi.rcx = {
           state: "closed",
-        }
+        };
         fdi.wcx = {
           state: "closed",
-        }
+        };
 
         switch (rcx.state) {
           case "connecting":
@@ -691,7 +732,13 @@ export default class Wasi {
     }
   }
 
-  sock_recv(fd: number, ri_data: number, ri_data_len: number, ri_flags: number, result: number): number {
+  sock_recv(
+    fd: number,
+    ri_data: number,
+    ri_data_len: number,
+    ri_flags: number,
+    result: number,
+  ): number {
     if (ri_flags !== 0) {
       return ENOSYS;
     }
@@ -730,7 +777,7 @@ export default class Wasi {
             state: "reading",
             stream,
             reader,
-          }
+          };
           Atomics.store(fdi.sig, 0, 0);
           Atomics.notify(fdi.sig, 0);
           reader.read(new Uint8Array(buf.buffer)).then(({ value, done }) => {
@@ -746,7 +793,7 @@ export default class Wasi {
               fdi.rcx = {
                 stream,
                 state: "eof",
-              }
+              };
               return;
             }
 
@@ -755,7 +802,7 @@ export default class Wasi {
               buf: value,
               stream,
               reader,
-            }
+            };
           }).catch((error) => {
             Atomics.store(fdi.sig, 0, 1);
             Atomics.notify(fdi.sig, 0);
@@ -763,14 +810,15 @@ export default class Wasi {
             fdi.rcx = {
               state: "error",
               error,
-            }
+            };
           });
           return EAGAIN;
         }
 
         let filled = 0;
         for (let i = 0; i < ri_data_len; i++) {
-          const dst = new Iovec(this.#memview, ri_data + (i * 8/*sizeof iovec*/)).buf;
+          const dst =
+            new Iovec(this.#memview, ri_data + (i * 8 /*sizeof iovec*/)).buf;
           const len = Math.min(buf.byteLength, dst.byteLength);
           dst.set(buf.subarray(0, len));
           filled += len;
@@ -784,11 +832,18 @@ export default class Wasi {
         return 0;
       }
 
-      default: return EINVAL;
+      default:
+        return EINVAL;
     }
   }
 
-  sock_send(fd: number, si_data: number, si_data_len: number, _si_flags: number, result: number): number {
+  sock_send(
+    fd: number,
+    si_data: number,
+    si_data_len: number,
+    _si_flags: number,
+    result: number,
+  ): number {
     const fdi = this.#fds[fd];
     if (!fdi) {
       return EINVAL;
@@ -819,7 +874,7 @@ export default class Wasi {
               buf,
               stream,
               writer,
-            }
+            };
             this.#memview.setInt32(result, len, true); // TODO on idle
             return 0;
           }
@@ -831,12 +886,13 @@ export default class Wasi {
           state: "writing",
           stream,
           writer,
-        }
+        };
         Atomics.store(fdi.sig, 1, 0);
         Atomics.notify(fdi.sig, 1);
 
         for (let i = 0; i < si_data_len; i++) {
-          const src = new Ciovec(this.#memview, si_data + (i * 8/*sizeof ciovec*/)).buf;
+          const src =
+            new Ciovec(this.#memview, si_data + (i * 8 /*sizeof ciovec*/)).buf;
           const len = Math.min(buf.byteLength, src.byteLength);
           buf.set(src.subarray(0, len));
           buf = buf.subarray(buf.byteOffset + len);
@@ -860,7 +916,7 @@ export default class Wasi {
             buf: new Uint8Array(buf.buffer),
             stream,
             writer,
-          }
+          };
         }).catch((error) => {
           Atomics.store(fdi.sig, 1, 1);
           Atomics.notify(fdi.sig, 1);
@@ -868,20 +924,29 @@ export default class Wasi {
           fdi.wcx = {
             state: "error",
             error,
-          }
+          };
         });
         return EAGAIN;
       }
 
-      default: return EINVAL;
+      default:
+        return EINVAL;
     }
   }
 
-  poll_oneoff(in_: number, out: number, nsubscriptions: number, result: number): number {
+  poll_oneoff(
+    in_: number,
+    out: number,
+    nsubscriptions: number,
+    result: number,
+  ): number {
     const view = this.#memview;
     let stored = 0;
     for (let i = 0; i < nsubscriptions; i++) {
-      const sub = new Subscription(view, in_ + (i * 48)/*sizeof subscription*/);
+      const sub = new Subscription(
+        view,
+        in_ + (i * 48), /*sizeof subscription*/
+      );
 
       const [tag, val] = sub.u.val;
       switch (tag) {
@@ -901,13 +966,16 @@ export default class Wasi {
               break;
 
             case "idle": {
-              const event = new Event(view, out + ((stored++) * 32/*sizeof event*/));
+              const event = new Event(
+                view,
+                out + ((stored++) * 32 /*sizeof event*/),
+              );
               event.userdata = sub.userdata;
               event.type = EVENTTYPE_FD_READ;
               event.fd_readwrite = {
                 nbytes: BigInt(fd.rcx.buf.byteLength),
                 flags: [],
-              }
+              };
               break;
             }
 
@@ -916,13 +984,16 @@ export default class Wasi {
             case "closed":
               //fallthrough
             case "eof": {
-              const event = new Event(view, out + ((stored++) * 32/*sizeof event*/));
+              const event = new Event(
+                view,
+                out + ((stored++) * 32 /*sizeof event*/),
+              );
               event.userdata = sub.userdata;
               event.type = EVENTTYPE_FD_READ;
               event.fd_readwrite = {
                 nbytes: BigInt(0),
                 flags: [],
-              }
+              };
               break;
             }
           }
@@ -944,13 +1015,16 @@ export default class Wasi {
               break;
 
             case "idle": {
-              const event = new Event(view, out + ((stored++) * 32/*sizeof event*/));
+              const event = new Event(
+                view,
+                out + ((stored++) * 32 /*sizeof event*/),
+              );
               event.userdata = sub.userdata;
               event.type = EVENTTYPE_FD_WRITE;
               event.fd_readwrite = {
                 nbytes: BigInt(fd.wcx.buf.byteLength),
                 flags: [],
-              }
+              };
               break;
             }
           }
@@ -964,7 +1038,10 @@ export default class Wasi {
 
   get exports(): WebAssembly.ModuleImports {
     //const stub = (name: string) => (...rest: unknown[]) => console.log("STUB", name, ...rest);
-    const stub = (name: string) => (...rest: unknown[]) => { throw new Error(`${name} ${rest.join(" ")}`) };
+    const stub = (name: string) =>
+      (...rest: unknown[]) => {
+        throw new Error(`${name} ${rest.join(" ")}`);
+      };
     const exports = [
       "args_get",
       "args_sizes_get",
@@ -1018,7 +1095,9 @@ export default class Wasi {
         return null;
       }
       return fn;
-    }
-    return Object.fromEntries(exports.map(name => [name, thisfn(name)?.bind(this) ?? stub(name)]));
+    };
+    return Object.fromEntries(
+      exports.map((name) => [name, thisfn(name)?.bind(this) ?? stub(name)]),
+    );
   }
 }

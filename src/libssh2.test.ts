@@ -1,4 +1,5 @@
 import { spawn } from "child_process";
+import type { StdioOptions } from "child_process";
 import { fileURLToPath } from "url";
 import fs from "fs/promises";
 import net from "net";
@@ -8,23 +9,40 @@ import path from "path";
 
 import { newLibssh2 } from "./libssh2.js";
 
+const debug = typeof process.env["DEBUG"] !== "undefined";
+
 const crypto = webcrypto as unknown as Crypto;
 
 let container: undefined | {
-  id: string
-  ipaddr: string
+  id: string;
+  ipaddr: string;
 };
 
-async function docker(args: string[], capture: true): Promise<string>
-async function docker(args: string[], capture: false): Promise<void>
-async function docker(args: string[]): Promise<void>
-async function docker(args: string[], capture: boolean | undefined = false): Promise<string | void> {
+async function docker(args: string[], stdio: "capture"): Promise<string>;
+async function docker(
+  args: string[],
+  stdio?: "quiet" | "inherit",
+): Promise<void>;
+async function docker(
+  args: string[],
+  stdio: "capture" | "quiet" | "inherit" = "quiet",
+): Promise<string | void> {
+  const s = (() => {
+    switch (stdio) {
+      case "capture":
+        return ["ignore", "pipe", "inherit"];
+      case "inherit":
+        return ["ignore", "inherit", "inherit"];
+      case "quiet":
+        return ["ignore", "ignore", "ignore"];
+    }
+  })() as StdioOptions;
   const proc = spawn("docker", args, {
-    stdio: capture ? ["ignore", "pipe", "inherit"]: "ignore",
+    stdio: s,
   });
 
   const buf: string[] = [];
-  if (capture) {
+  if (stdio === "capture") {
     if (!proc.stdout) {
       throw new Error(); // unreachable
     }
@@ -42,7 +60,7 @@ async function docker(args: string[], capture: boolean | undefined = false): Pro
     throw new Error(`failed ${result}: docker ${args.join(" ")}`);
   }
 
-  if (!capture) {
+  if (stdio !== "capture") {
     return;
   }
   return buf.join("").trimEnd();
@@ -51,12 +69,28 @@ async function docker(args: string[], capture: boolean | undefined = false): Pro
 beforeAll(async () => {
   const dir = fileURLToPath(new URL("./libssh2.test/", import.meta.url));
   await docker(["buildx", "build", dir, "-t", "libssh2-test-sshd"]);
-  const name = await docker(["run", "--rm", "-d", "libssh2-test-sshd"], true);
-  const ipaddr = await docker(["inspect", "-f", "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}", name], true);
+  const name = await docker(
+    ["run", "--rm", "-d", "libssh2-test-sshd"],
+    "capture",
+  );
+  const ipaddr = await docker([
+    "inspect",
+    "-f",
+    "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}",
+    name,
+  ], "capture");
 
   container = {
     id: name,
     ipaddr,
+  };
+  if (debug) {
+    console.log(
+      "container.id:",
+      container.id,
+      "container.ipaddr:",
+      container.ipaddr,
+    );
   }
 }, 60 * 1000);
 
@@ -64,18 +98,24 @@ afterAll(async () => {
   if (typeof container === "undefined") {
     return;
   }
+  await docker(["logs", container.id], debug ? "inherit" : "quiet");
   await docker(["kill", container.id]);
 });
 
 async function cc(src: string): Promise<Uint8Array> {
-  const cc = path.join(process.env["WASI_SDK_ROOT"] ?? "/opt/wasi-sdk", "/bin/clang");
+  const cc = path.join(
+    process.env["WASI_SDK_ROOT"] ?? "/opt/wasi-sdk",
+    "/bin/clang",
+  );
   const tmpdir = await fs.mkdtemp("");
   try {
     const c = path.join(tmpdir, "c.c");
     const exe = path.join(tmpdir, "a.out");
     await fs.writeFile(c, src);
 
-    const proc = spawn(cc, [ "-mexec-model=reactor", "-o", exe, c ], { stdio: ["ignore", "inherit", "inherit"] });
+    const proc = spawn(cc, ["-mexec-model=reactor", "-o", exe, c], {
+      stdio: ["ignore", "inherit", "inherit"],
+    });
     const result = await new Promise((resolve, reject) => {
       proc.on("exit", resolve);
       proc.on("error", reject);
@@ -89,11 +129,14 @@ async function cc(src: string): Promise<Uint8Array> {
   }
 }
 
-function fetcher(){
+function fetcher() {
   return fs.readFile(new URL("../libssh2.wasm", import.meta.url));
 }
 
-function netFactory(host: string, port: number): Promise<[ReadableStream<Uint8Array>, WritableStream<Uint8Array>]> {
+function netFactory(
+  host: string,
+  port: number,
+): Promise<[ReadableStream<Uint8Array>, WritableStream<Uint8Array>]> {
   const sock = net.createConnection(port, host);
   sock.pause();
 
@@ -108,7 +151,7 @@ function netFactory(host: string, port: number): Promise<[ReadableStream<Uint8Ar
         sock.off("data", ondata);
         sock.off("error", onerror);
         sock.off("close", onclose);
-      }
+      };
 
       function ondata(data: Uint8Array) {
         controller.enqueue(data);
@@ -146,7 +189,7 @@ function netFactory(host: string, port: number): Promise<[ReadableStream<Uint8Ar
     },
 
     close() {
-      return new Promise(resolve => {
+      return new Promise((resolve) => {
         sock.end(resolve);
       });
     },
@@ -162,7 +205,8 @@ describe("newLibssh2", () => {
       netFactory,
       crypto,
       ReadableStream,
-      WritableStream: WritableStream as unknown as typeof globalThis.WritableStream, // TODO
+      WritableStream:
+        WritableStream as unknown as typeof globalThis.WritableStream, // TODO
     });
   });
 
@@ -172,7 +216,8 @@ describe("newLibssh2", () => {
       netFactory,
       crypto,
       ReadableStream,
-      WritableStream: WritableStream as unknown as typeof globalThis.WritableStream, // TODO
+      WritableStream:
+        WritableStream as unknown as typeof globalThis.WritableStream, // TODO
     });
     await expect(t).rejects.toThrowError("Missing exported function");
   });
@@ -189,13 +234,16 @@ describe("Session.connect", () => {
       netFactory,
       crypto,
       ReadableStream,
-      WritableStream: WritableStream as unknown as typeof globalThis.WritableStream, // TODO
+      WritableStream:
+        WritableStream as unknown as typeof globalThis.WritableStream, // TODO
     });
     const session = await lib.connect({
       host: container.ipaddr,
-      knownhost: `${container.ipaddr} ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINN5qBcVhQt0gPmGxgsxgt9429S74QH/LWGuHjVBPZ9p`,
+      knownhost:
+        `${container.ipaddr} ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINN5qBcVhQt0gPmGxgsxgt9429S74QH/LWGuHjVBPZ9p`,
       username: "root",
-      privatekey: () => fs.readFile(new URL("./libssh2.test/id_ed25519", import.meta.url)),
+      privatekey: () =>
+        fs.readFile(new URL("./libssh2.test/id_ed25519", import.meta.url)),
     });
     await session.disconnect();
     session.close(); // TODO
@@ -212,13 +260,16 @@ describe("Session.connect", () => {
       netFactory,
       crypto,
       ReadableStream,
-      WritableStream: WritableStream as unknown as typeof globalThis.WritableStream, // TODO
+      WritableStream:
+        WritableStream as unknown as typeof globalThis.WritableStream, // TODO
     });
     const result = lib.connect({
       host: container.ipaddr,
-      knownhost: `${container.ipaddr} ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFMy8Wg7bxkeS/C56sIuN5KaXPwujbtv1I/R6ZYm27Km`,
+      knownhost:
+        `${container.ipaddr} ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFMy8Wg7bxkeS/C56sIuN5KaXPwujbtv1I/R6ZYm27Km`,
       username: "root",
-      privatekey: () => fs.readFile(new URL("./libssh2.test/id_ed25519", import.meta.url)),
+      privatekey: () =>
+        fs.readFile(new URL("./libssh2.test/id_ed25519", import.meta.url)),
     });
     await expect(result).rejects.toThrowError("Knownhost key check mismatch");
   });
@@ -233,13 +284,16 @@ describe("Session.connect", () => {
       netFactory,
       crypto,
       ReadableStream,
-      WritableStream: WritableStream as unknown as typeof globalThis.WritableStream, // TODO
+      WritableStream:
+        WritableStream as unknown as typeof globalThis.WritableStream, // TODO
     });
     const result = lib.connect({
       host: container.ipaddr,
-      knownhost: `0.0.0.0 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINN5qBcVhQt0gPmGxgsxgt9429S74QH/LWGuHjVBPZ9p`,
+      knownhost:
+        `0.0.0.0 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINN5qBcVhQt0gPmGxgsxgt9429S74QH/LWGuHjVBPZ9p`,
       username: "root",
-      privatekey: () => fs.readFile(new URL("./libssh2.test/id_ed25519", import.meta.url)),
+      privatekey: () =>
+        fs.readFile(new URL("./libssh2.test/id_ed25519", import.meta.url)),
     });
     await expect(result).rejects.toThrowError("Knownhost key check notfound");
   });
@@ -254,15 +308,20 @@ describe("Session.connect", () => {
       netFactory,
       crypto,
       ReadableStream,
-      WritableStream: WritableStream as unknown as typeof globalThis.WritableStream, // TODO
+      WritableStream:
+        WritableStream as unknown as typeof globalThis.WritableStream, // TODO
     });
     const result = lib.connect({
       host: container.ipaddr,
-      knownhost: `${container.ipaddr} ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINN5qBcVhQt0gPmGxgsxgt9429S74QH/LWGuHjVBPZ9p`,
+      knownhost:
+        `${container.ipaddr} ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINN5qBcVhQt0gPmGxgsxgt9429S74QH/LWGuHjVBPZ9p`,
       username: "rootx",
-      privatekey: () => fs.readFile(new URL("./libssh2.test/id_ed25519", import.meta.url)),
+      privatekey: () =>
+        fs.readFile(new URL("./libssh2.test/id_ed25519", import.meta.url)),
     });
-    await expect(result).rejects.toThrow("-18: Username/PublicKey combination invalid");
+    await expect(result).rejects.toThrow(
+      "-18: Username/PublicKey combination invalid",
+    );
   });
 });
 
@@ -277,13 +336,16 @@ describe("Session.exec", () => {
       netFactory,
       crypto,
       ReadableStream,
-      WritableStream: WritableStream as unknown as typeof globalThis.WritableStream, // TODO
+      WritableStream:
+        WritableStream as unknown as typeof globalThis.WritableStream, // TODO
     });
     const session = await lib.connect({
       host: container.ipaddr,
-      knownhost: `${container.ipaddr} ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINN5qBcVhQt0gPmGxgsxgt9429S74QH/LWGuHjVBPZ9p`,
+      knownhost:
+        `${container.ipaddr} ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINN5qBcVhQt0gPmGxgsxgt9429S74QH/LWGuHjVBPZ9p`,
       username: "root",
-      privatekey: () => fs.readFile(new URL("./libssh2.test/id_ed25519", import.meta.url)),
+      privatekey: () =>
+        fs.readFile(new URL("./libssh2.test/id_ed25519", import.meta.url)),
     });
     try {
       const channel = await session.exec("/bin/true");
@@ -311,13 +373,16 @@ describe("Session.exec", () => {
       netFactory,
       crypto,
       ReadableStream,
-      WritableStream: WritableStream as unknown as typeof globalThis.WritableStream, // TODO
+      WritableStream:
+        WritableStream as unknown as typeof globalThis.WritableStream, // TODO
     });
     const session = await lib.connect({
       host: container.ipaddr,
-      knownhost: `${container.ipaddr} ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINN5qBcVhQt0gPmGxgsxgt9429S74QH/LWGuHjVBPZ9p`,
+      knownhost:
+        `${container.ipaddr} ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINN5qBcVhQt0gPmGxgsxgt9429S74QH/LWGuHjVBPZ9p`,
       username: "root",
-      privatekey: () => fs.readFile(new URL("./libssh2.test/id_ed25519", import.meta.url)),
+      privatekey: () =>
+        fs.readFile(new URL("./libssh2.test/id_ed25519", import.meta.url)),
     });
     try {
       const channel = await session.exec("/bin/false");
@@ -345,13 +410,16 @@ describe("Session.exec", () => {
       netFactory,
       crypto,
       ReadableStream,
-      WritableStream: WritableStream as unknown as typeof globalThis.WritableStream, // TODO
+      WritableStream:
+        WritableStream as unknown as typeof globalThis.WritableStream, // TODO
     });
     const session = await lib.connect({
       host: container.ipaddr,
-      knownhost: `${container.ipaddr} ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINN5qBcVhQt0gPmGxgsxgt9429S74QH/LWGuHjVBPZ9p`,
+      knownhost:
+        `${container.ipaddr} ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINN5qBcVhQt0gPmGxgsxgt9429S74QH/LWGuHjVBPZ9p`,
       username: "root",
-      privatekey: () => fs.readFile(new URL("./libssh2.test/id_ed25519", import.meta.url)),
+      privatekey: () =>
+        fs.readFile(new URL("./libssh2.test/id_ed25519", import.meta.url)),
     });
     try {
       const channel = await session.exec("/bin/echo -n hello");
@@ -359,17 +427,18 @@ describe("Session.exec", () => {
         const { stdout } = channel;
         const chunks = [] as string[];
         const decoder = new TextDecoder();
-        await stdout.pipeTo(new WritableStream({
-          write(chunk) {
-            chunks.push(decoder.decode(chunk, { stream: true }));
-          },
-          close() {
-            chunks.push(decoder.decode(new Uint8Array()));
-          },
-        }));
-        expect(chunks.join("")).toBe("hello");
-
+        await stdout.pipeTo(
+          new WritableStream({
+            write(chunk) {
+              chunks.push(decoder.decode(chunk, { stream: true }));
+            },
+            close() {
+              chunks.push(decoder.decode(new Uint8Array()));
+            },
+          }),
+        );
         await channel.waitEof();
+        expect(chunks.join("")).toBe("hello");
       } finally {
         await channel.close();
         channel.free(); // TODO
@@ -391,31 +460,37 @@ describe("Session.exec", () => {
       netFactory,
       crypto,
       ReadableStream,
-      WritableStream: WritableStream as unknown as typeof globalThis.WritableStream, // TODO
+      WritableStream:
+        WritableStream as unknown as typeof globalThis.WritableStream, // TODO
     });
     const session = await lib.connect({
       host: container.ipaddr,
-      knownhost: `${container.ipaddr} ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINN5qBcVhQt0gPmGxgsxgt9429S74QH/LWGuHjVBPZ9p`,
+      knownhost:
+        `${container.ipaddr} ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINN5qBcVhQt0gPmGxgsxgt9429S74QH/LWGuHjVBPZ9p`,
       username: "root",
-      privatekey: () => fs.readFile(new URL("./libssh2.test/id_ed25519", import.meta.url)),
+      privatekey: () =>
+        fs.readFile(new URL("./libssh2.test/id_ed25519", import.meta.url)),
     });
     try {
-      const channel = await session.exec("/bin/bash -c '/bin/echo -n hello >&2'");
+      const channel = await session.exec(
+        "/bin/bash -c '/bin/echo -n hello >&2'",
+      );
       try {
         const { stderr } = channel;
         const chunks = [] as string[];
         const decoder = new TextDecoder();
-        await stderr.pipeTo(new WritableStream({
-          write(chunk) {
-            chunks.push(decoder.decode(chunk, { stream: true }));
-          },
-          close() {
-            chunks.push(decoder.decode(new Uint8Array()));
-          },
-        }));
-        expect(chunks.join("")).toBe("hello");
-
+        await stderr.pipeTo(
+          new WritableStream({
+            write(chunk) {
+              chunks.push(decoder.decode(chunk, { stream: true }));
+            },
+            close() {
+              chunks.push(decoder.decode(new Uint8Array()));
+            },
+          }),
+        );
         await channel.waitEof();
+        expect(chunks.join("")).toContain("hello");
       } finally {
         await channel.close();
         channel.free(); // TODO
@@ -437,13 +512,16 @@ describe("Session.exec", () => {
       netFactory,
       crypto,
       ReadableStream,
-      WritableStream: WritableStream as unknown as typeof globalThis.WritableStream, // TODO
+      WritableStream:
+        WritableStream as unknown as typeof globalThis.WritableStream, // TODO
     });
     const session = await lib.connect({
       host: container.ipaddr,
-      knownhost: `${container.ipaddr} ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINN5qBcVhQt0gPmGxgsxgt9429S74QH/LWGuHjVBPZ9p`,
+      knownhost:
+        `${container.ipaddr} ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINN5qBcVhQt0gPmGxgsxgt9429S74QH/LWGuHjVBPZ9p`,
       username: "root",
-      privatekey: () => fs.readFile(new URL("./libssh2.test/id_ed25519", import.meta.url)),
+      privatekey: () =>
+        fs.readFile(new URL("./libssh2.test/id_ed25519", import.meta.url)),
     });
     try {
       const channel = await session.exec("/bin/cat");
@@ -451,14 +529,16 @@ describe("Session.exec", () => {
         const { stdin, stdout } = channel;
         const chunks = [] as string[];
         const decoder = new TextDecoder();
-        const t1 = stdout.pipeTo(new WritableStream({
-          write(chunk) {
-            chunks.push(decoder.decode(chunk, { stream: true }));
-          },
-          close() {
-            chunks.push(decoder.decode(new Uint8Array()));
-          },
-        }));
+        const t1 = stdout.pipeTo(
+          new WritableStream({
+            write(chunk) {
+              chunks.push(decoder.decode(chunk, { stream: true }));
+            },
+            close() {
+              chunks.push(decoder.decode(new Uint8Array()));
+            },
+          }),
+        );
         const t2 = new ReadableStream({
           start(controller) {
             controller.enqueue(new TextEncoder().encode("hello"));
@@ -467,9 +547,8 @@ describe("Session.exec", () => {
           type: "bytes",
         }).pipeTo(stdin);
         await Promise.all([t1, t2]);
-        expect(chunks.join("")).toBe("hello");
-
         await channel.waitEof();
+        expect(chunks.join("")).toBe("hello");
       } finally {
         await channel.close();
         channel.free(); // TODO
@@ -480,5 +559,4 @@ describe("Session.exec", () => {
       session.free(); // TODO
     }
   });
-
 });

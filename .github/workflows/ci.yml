@@ -1,0 +1,93 @@
+name: Ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Cache deps
+        uses: actions/cache@v3
+        with:
+          path: deps
+          key: ${{ runner.os }}-${{ hashFiles('Makefile') }}
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y --no-install-recommends curl ca-certificates patch make binaryen wabt unzip
+          sudo mkdir $WASI_ROOT
+          curl -sSfL $WASI_SDK_URL | sudo tar zxf - -C $WASI_ROOT --strip-components 1
+          echo /opt/wasi-sdk/bin >> $GITHUB_PATH
+        env:
+          WASI_ROOT: /opt/wasi-sdk
+          WASI_SDK_URL: 'https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-14/wasi-sdk-14.0-linux.tar.gz'
+
+      - run: make libssh2.wasm
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: libssh2.wasm
+          path: libssh2.wasm
+
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: denoland/setup-deno@v1
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+          cache: 'npm'
+
+      - run: npm run fmt:check
+
+      - run: npm ci
+
+      - run: npx tsc
+
+      - run: npm run lint
+
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y --no-install-recommends curl ca-certificates patch make binaryen wabt unzip
+          sudo mkdir $WASI_ROOT
+          curl -sSfL $WASI_SDK_URL | sudo tar zxf - -C $WASI_ROOT --strip-components 1
+          echo /opt/wasi-sdk/bin >> $GITHUB_PATH
+        env:
+          WASI_ROOT: /opt/wasi-sdk
+          WASI_SDK_URL: 'https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-14/wasi-sdk-14.0-linux.tar.gz'
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - uses: actions/download-artifact@v3
+        with:
+          name: libssh2.wasm
+
+      - run: docker buildx build src/libssh2.test -t libssh2-test-sshd
+
+      - run: npm test -- --coverage
+        env:
+          DEBUG: 1
+
+      - uses: codecov/codecov-action@v2

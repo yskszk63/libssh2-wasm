@@ -1,9 +1,16 @@
 openssl_url = https://www.openssl.org/source/openssl-1.1.1n.tar.gz
-openssl_dir = openssl
+openssl_tar_gz = deps/openssl.tar.gz
+openssl_dir = deps/openssl
+libcrypto_a = $(openssl_dir)/libcrypto.a
+libssl_a = $(openssl_dir)/libssl.a
 
 libssh2_url = https://www.libssh2.org/download/libssh2-1.10.0.tar.gz
-libssh2_dir = libssh2
-libssh2_build_dir = libssh2_build
+libssh2_tar_gz = deps/libssh2.tar.gz
+libssh2_dir = deps/libssh2
+libssh2_build_dir = deps/libssh2_build
+libssh2_so = $(libssh2_build_dir)/src/libssh2.so
+
+libssh2_wasm = libssh2.wasm
 
 WASI_SDK_PREFIX = /opt/wasi-sdk
 CC = $(WASI_SDK_PREFIX)/bin/clang
@@ -35,15 +42,11 @@ openssl_ldflags  = -lwasi-emulated-signal
 openssl_ldflags += -lwasi-emulated-process-clocks
 openssl_ldflags += -lwasi-emulated-mman
 
-#libssh2_ldflags  = -nostartfiles
-#libssh2_ldflags += -Wl,--no-entry
-#libssh2_ldflags += -Wl,--export-all
 libssh2_ldflags += -lwasi-emulated-signal
 libssh2_ldflags += -lwasi-emulated-process-clocks
 libssh2_ldflags += -lwasi-emulated-mman
 libssh2_ldflags += -Wl,--allow-undefined
 libssh2_ldflags += -mexec-model=reactor
-
 
 libssh2_ldflags += -Wl,--export=errno
 libssh2_ldflags += -Wl,--export=malloc
@@ -225,29 +228,31 @@ libssh2_ldflags += -Wl,--export=libssh2_userauth_publickey_fromfile_ex
 libssh2_ldflags += -Wl,--export=libssh2_userauth_publickey_frommemory
 libssh2_ldflags += -Wl,--export=libssh2_version
 
-libssh2.wasm: $(libssh2_build_dir)/src/libssh2.so make-libssh2
+$(libssh2_wasm): $(libssh2_so)
 	cp $< $@
 
-.PHONY: make-libssh2
-make-libssh2: make-openssl
-	$(RM) -rf $(libssh2_build_dir)
-	mkdir $(libssh2_build_dir)
-	$(CMAKE) -S $(libssh2_dir) -B $(libssh2_build_dir) --toolchain $(WASI_SDK_PREFIX)/share/cmake/wasi-sdk.cmake -DWASI_SDK_PREFIX=$(WASI_SDK_PREFIX) -DBUILD_SHARED_LIBS=ON -DCRYPTO_BACKEND=OpenSSL -DOPENSSL_CRYPTO_LIBRARY=$(openssl_dir)/libcrypto.a -DOPENSSL_SSL_LIBRARY=$(openssl_dir)/libssl.a -DOPENSSL_INCLUDE_DIR=$(openssl_dir)/include -DCMAKE_C_COMPILER_ID=Clang -DCMAKE_SHARED_LINKER_FLAGS="$(libssh2_ldflags)" -DCMAKE_BUILD_TYPE=Release
+$(libssh2_so): $(libssh2_build_dir)/Makefile
 	$(CMAKE) --build $(libssh2_build_dir) --target libssh2
 
-.PHONY: make-openssl
-make-openssl:
+$(libssh2_build_dir)/Makefile: $(libssl_a) $(libcrypto_a) $(libssh2_dir)/CMakeLists.txt
+	mkdir -p $(libssh2_build_dir)
+	$(CMAKE) -S $(libssh2_dir) -B $(libssh2_build_dir) --toolchain $(WASI_SDK_PREFIX)/share/cmake/wasi-sdk.cmake -DWASI_SDK_PREFIX=$(WASI_SDK_PREFIX) -DBUILD_SHARED_LIBS=ON -DCRYPTO_BACKEND=OpenSSL -DOPENSSL_CRYPTO_LIBRARY=$(openssl_dir)/libcrypto.a -DOPENSSL_SSL_LIBRARY=$(openssl_dir)/libssl.a -DOPENSSL_INCLUDE_DIR=$(openssl_dir)/include -DCMAKE_C_COMPILER_ID=Clang -DCMAKE_SHARED_LINKER_FLAGS="$(libssh2_ldflags)" -DCMAKE_BUILD_TYPE=Release
+
+$(libssl_a) $(libcrypto_a): $(openssl_dir)/Configure
 	cd $(openssl_dir) && CC=$(CC) AR=$(AR) RANLIB=$(RANLIB) ./Configure $(openssl_configure_opts) $(openssl_target)
 	$(MAKE) -C $(openssl_dir) build_libs CFLAGS="$(openssl_cflags)" LDFLAGS="$(openssl_ldflags)"
 
-.PHONY: fetch-libssh2
-fetch-libssh2:
-	$(RM) -rf $(libssh2_dir)
-	mkdir $(libssh2_dir)
-	curl -sSfL $(libssh2_url) | tar zxf - --strip-components=1 -C $(libssh2_dir)
+$(libssh2_dir)/CMakeLists.txt:
+	mkdir -p dpes $(libssh2_dir)
+	curl -sSfL $(libssh2_url) -o $(libssh2_tar_gz)
+	tar zxf $(libssh2_tar_gz) --strip-components=1 -C $(libssh2_dir)
 
-.PHONY: fetch-openssl
-fetch-openssl:
-	$(RM) -rf $(openssl_dir)
-	mkdir $(openssl_dir)
-	curl -sSfL $(openssl_url) | tar zxf - --strip-components=1 -C $(openssl_dir)
+$(openssl_dir)/Configure:
+	mkdir -p deps $(openssl_dir)
+	curl -sSfL $(openssl_url) -o $(openssl_tar_gz)
+	tar zxf $(openssl_tar_gz) --strip-components=1 -C $(openssl_dir)
+
+.PHONY: clean
+clean:
+	$(RM) -rf deps
+	$(RM) $(libssh2_wasm)

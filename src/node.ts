@@ -4,13 +4,9 @@ import { ReadableStream, WritableStream } from "stream/web";
 import { webcrypto } from "crypto";
 
 import { newLibssh2 } from "./libssh2.js";
-import type {
-  ConnectOpts,
-} from "./libssh2.js";
+import type { ConnectOpts } from "./libssh2.js";
 
-export type {
-  ConnectOpts,
-} from "./libssh2.js";
+export type { ConnectOpts } from "./libssh2.js";
 
 const libssh2 = await newLibssh2({
   fetcher() {
@@ -22,11 +18,11 @@ const libssh2 = await newLibssh2({
 
     const reader = new ReadableStream({
       start(controller) {
-        sock.on("data", data => {
+        sock.on("data", (data) => {
           controller.enqueue(data);
           sock.pause();
         });
-        sock.on("error", err => {
+        sock.on("error", (err) => {
           controller.error(err);
         });
         sock.on("close", () => {
@@ -52,7 +48,7 @@ const libssh2 = await newLibssh2({
       },
 
       close() {
-        return new Promise(resolve => {
+        return new Promise((resolve) => {
           sock.end(resolve);
         });
       },
