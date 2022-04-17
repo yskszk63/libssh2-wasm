@@ -437,9 +437,8 @@ describe("Session.exec", () => {
             },
           }),
         );
-        expect(chunks.join("")).toBe("hello");
-
         await channel.waitEof();
+        expect(chunks.join("")).toBe("hello");
       } finally {
         await channel.close();
         channel.free(); // TODO
@@ -490,9 +489,8 @@ describe("Session.exec", () => {
             },
           }),
         );
-        expect(chunks.join("")).toContain("hello");
-
         await channel.waitEof();
+        expect(chunks.join("")).toContain("hello");
       } finally {
         await channel.close();
         channel.free(); // TODO
@@ -549,9 +547,8 @@ describe("Session.exec", () => {
           type: "bytes",
         }).pipeTo(stdin);
         await Promise.all([t1, t2]);
-        expect(chunks.join("")).toBe("hello");
-
         await channel.waitEof();
+        expect(chunks.join("")).toBe("hello");
       } finally {
         await channel.close();
         channel.free(); // TODO
