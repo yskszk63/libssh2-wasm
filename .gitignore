@@ -1,5 +1,3 @@
 libssh2.wasm
 deps/
-coverage/
-node_modules/
-*.wasm
+src/libssh2.wasm.js

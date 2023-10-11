@@ -1,0 +1,163 @@
+export const snapshot = {};
+
+snapshot[`snapshot - imports 1`] = `
+[
+  {
+    kind: "function",
+    module: "wasi_snapshot_preview1",
+    name: "environ_get",
+  },
+  {
+    kind: "function",
+    module: "wasi_snapshot_preview1",
+    name: "environ_sizes_get",
+  },
+  {
+    kind: "function",
+    module: "wasi_snapshot_preview1",
+    name: "clock_time_get",
+  },
+  {
+    kind: "function",
+    module: "wasi_snapshot_preview1",
+    name: "fd_close",
+  },
+  {
+    kind: "function",
+    module: "wasi_snapshot_preview1",
+    name: "fd_fdstat_get",
+  },
+  {
+    kind: "function",
+    module: "wasi_snapshot_preview1",
+    name: "fd_fdstat_set_flags",
+  },
+  {
+    kind: "function",
+    module: "wasi_snapshot_preview1",
+    name: "fd_filestat_get",
+  },
+  {
+    kind: "function",
+    module: "wasi_snapshot_preview1",
+    name: "fd_prestat_get",
+  },
+  {
+    kind: "function",
+    module: "wasi_snapshot_preview1",
+    name: "fd_prestat_dir_name",
+  },
+  {
+    kind: "function",
+    module: "wasi_snapshot_preview1",
+    name: "fd_read",
+  },
+  {
+    kind: "function",
+    module: "wasi_snapshot_preview1",
+    name: "fd_readdir",
+  },
+  {
+    kind: "function",
+    module: "wasi_snapshot_preview1",
+    name: "fd_seek",
+  },
+  {
+    kind: "function",
+    module: "wasi_snapshot_preview1",
+    name: "fd_write",
+  },
+  {
+    kind: "function",
+    module: "wasi_snapshot_preview1",
+    name: "path_filestat_get",
+  },
+  {
+    kind: "function",
+    module: "wasi_snapshot_preview1",
+    name: "path_open",
+  },
+  {
+    kind: "function",
+    module: "wasi_snapshot_preview1",
+    name: "poll_oneoff",
+  },
+  {
+    kind: "function",
+    module: "wasi_snapshot_preview1",
+    name: "proc_exit",
+  },
+  {
+    kind: "function",
+    module: "wasi_snapshot_preview1",
+    name: "random_get",
+  },
+  {
+    kind: "function",
+    module: "wasi_snapshot_preview1",
+    name: "sock_recv",
+  },
+  {
+    kind: "function",
+    module: "wasi_snapshot_preview1",
+    name: "sock_send",
+  },
+]
+`;
+
+snapshot[`snapshot - exports 1`] = `
+[
+  {
+    kind: "memory",
+    name: "memory",
+  },
+  {
+    kind: "function",
+    name: "_initialize",
+  },
+  {
+    kind: "function",
+    name: "malloc",
+  },
+  {
+    kind: "function",
+    name: "free",
+  },
+  {
+    kind: "global",
+    name: "errno",
+  },
+  {
+    kind: "function",
+    name: "close",
+  },
+  {
+    kind: "function",
+    name: "open",
+  },
+  {
+    kind: "function",
+    name: "strerror_r",
+  },
+  {
+    kind: "function",
+    name: "libssh2_init",
+  },
+  {
+    kind: "function",
+    name: "libssh2_session_init_ex",
+  },
+  {
+    kind: "function",
+    name: "libssh2_session_handshake",
+  },
+  {
+    kind: "function",
+    name: "libssh2_session_free",
+  },
+  {
+    kind: "function",
+    name: "libssh2_session_set_blocking",
+  },
+]
+`;

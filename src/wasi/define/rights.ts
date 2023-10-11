@@ -1,0 +1,32 @@
+import type * as ty from "@/wasi/ty/mod.ts";
+
+export const fd_datasync = 1n << 0n as ty.rights; // bool The right to invoke fd_datasync. If path_open is set, includes the right to invoke path_open with fdflags::dsync.
+export const fd_read = 1n << 1n as ty.rights; // bool The right to invoke fd_read and sock_recv. If rights::fd_seek is set, includes the right to invoke fd_pread.
+export const fd_seek = 1n << 2n as ty.rights; // bool The right to invoke fd_seek. This flag implies rights::fd_tell.
+export const fd_fdstat_set_flags = 1n << 3n as ty.rights; // bool The right to invoke fd_fdstat_set_flags.
+export const fd_sync = 1n << 4n as ty.rights; // bool The right to invoke fd_sync. If path_open is set, includes the right to invoke path_open with fdflags::rsync and fdflags::dsync.
+export const fd_tell = 1n << 5n as ty.rights; // bool The right to invoke fd_seek in such a way that the file offset remains unaltered (i.e., whence::cur with offset zero), or to invoke fd_tell.
+export const fd_write = 1n << 6n as ty.rights; // bool The right to invoke fd_write and sock_send. If rights::fd_seek is set, includes the right to invoke fd_pwrite.
+export const fd_advise = 1n << 7n as ty.rights; // bool The right to invoke fd_advise.
+export const fd_allocate = 1n << 8n as ty.rights; // bool The right to invoke fd_allocate.
+export const path_create_directory = 1n << 9n as ty.rights; // bool The right to invoke path_create_directory.
+export const path_create_file = 1n << 10n as ty.rights; // bool If path_open is set, the right to invoke path_open with oflags::creat.
+export const path_link_source = 1n << 11n as ty.rights; // bool The right to invoke path_link with the file descriptor as the source directory.
+export const path_link_target = 1n << 12n as ty.rights; // bool The right to invoke path_link with the file descriptor as the target directory.
+export const path_open = 1n << 13n as ty.rights; // bool The right to invoke path_open.
+export const fd_readdir = 1n << 14n as ty.rights; // bool The right to invoke fd_readdir.
+export const path_readlink = 1n << 15n as ty.rights; // bool The right to invoke path_readlink.
+export const path_rename_source = 1n << 16n as ty.rights; // bool The right to invoke path_rename with the file descriptor as the source directory.
+export const path_rename_target = 1n << 17n as ty.rights; // bool The right to invoke path_rename with the file descriptor as the target directory.
+export const path_filestat_get = 1n << 18n as ty.rights; // bool The right to invoke path_filestat_get.
+export const path_filestat_set_size = 1n << 19n as ty.rights; // bool The right to change a file's size. If path_open is set, includes the right to invoke path_open with oflags::trunc. Note: there is no function named path_filestat_set_size. This follows POSIX design, which only has ftruncate and does not provide ftruncateat. While such function would be desirable from the API design perspective, there are virtually no use cases for it since no code written for POSIX systems would use it. Moreover, implementing it would require multiple syscalls, leading to inferior performance.
+export const path_filestat_set_times = 1n << 20n as ty.rights; // bool The right to invoke path_filestat_set_times.
+export const fd_filestat_get = 1n << 21n as ty.rights; // bool The right to invoke fd_filestat_get.
+export const fd_filestat_set_size = 1n << 22n as ty.rights; // bool The right to invoke fd_filestat_set_size.
+export const fd_filestat_set_times = 1n << 23n as ty.rights; // bool The right to invoke fd_filestat_set_times.
+export const path_symlink = 1n << 24n as ty.rights; // bool The right to invoke path_symlink.
+export const path_remove_directory = 1n << 25n as ty.rights; // bool The right to invoke path_remove_directory.
+export const path_unlink_file = 1n << 26n as ty.rights; // bool The right to invoke path_unlink_file.
+export const poll_fd_readwrite = 1n << 27n as ty.rights; // bool If rights::fd_read is set, includes the right to invoke poll_oneoff to subscribe to eventtype::fd_read. If rights::fd_write is set, includes the right to invoke poll_oneoff to subscribe to eventtype::fd_write.
+export const sock_shutdown = 1n << 28n as ty.rights; // bool The right to invoke sock_shutdown.
+export const sock_accept = 1n << 29n as ty.rights; // bool The right to invoke sock_accept.
