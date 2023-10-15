@@ -4,6 +4,8 @@ export * from "@/wasi/fn/fd_fdstat_get.ts";
 export * from "@/wasi/fn/fd_fdstat_set_flags.ts";
 export * from "@/wasi/fn/fd_prestat_get.ts";
 export * from "@/wasi/fn/fd_prestat_dir_name.ts";
+export * from "@/wasi/fn/fd_filestat_get.ts";
+export * from "@/wasi/fn/fd_read.ts";
 export * from "@/wasi/fn/path_open.ts";
 export * from "@/wasi/fn/proc_exit.ts";
 export * from "@/wasi/fn/random_get.ts";

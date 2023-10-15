@@ -7,6 +7,10 @@ const socketPattern = new URLPattern({
   pathname: "/dev/socket",
 });
 
+const randomPattern = new URLPattern({
+  pathname: "/dev/(random|urandom)",
+});
+
 function decodePath(parent: Uint8Array, name: Uint8Array): string {
   const path = new Uint8Array(parent.byteLength + name.byteLength + 1);
   path.set(parent);
@@ -41,6 +45,28 @@ function path_open_socket(
   return errno.success;
 }
 
+function path_open_random(
+  cx: FdsContext,
+  fs_rights_base: ty.rights,
+  fs_rights_inheriting: ty.rights,
+  fdflags: ty.fdflags,
+  result: number,
+) {
+  const nextfd = cx.nextfd++;
+  cx.fds[nextfd] = {
+    stat: {
+      fs_filetype: filetype.socket_stream,
+      fs_flags: fdflags,
+      fs_rights_base,
+      fs_rights_inheriting,
+    },
+    type: "random",
+  };
+  const view = new DataView(cx.memory.buffer);
+  view.setUint32(result, nextfd, true);
+  return errno.success;
+}
+
 export function path_open(
   cx: FdsContext,
   fd: ty.fd,
@@ -63,9 +89,18 @@ export function path_open(
 
   const name = new Uint8Array(cx.memory.buffer, path, path_len);
   const pathname = decodePath(parent.name, name);
-  console.log(pathname);
 
   let _m: URLPatternResult | null;
+  if ((_m = randomPattern.exec({ pathname })) !== null) {
+    return path_open_random(
+      cx,
+      fs_rights_base,
+      fs_rights_inheriting,
+      fdflags,
+      result,
+    );
+  }
+
   if ((_m = socketPattern.exec({ pathname })) !== null) {
     return path_open_socket(
       cx,

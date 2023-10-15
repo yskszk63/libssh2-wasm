@@ -48,7 +48,12 @@ type SockFd =
     send: SockFdSendState;
   });
 
-export type FileDescriptor = DirFd | SockFd;
+type RandomFd = {
+  type: "random";
+  stat: ty.fdstat;
+};
+
+export type FileDescriptor = DirFd | SockFd | RandomFd;
 
 export type FdsContext = Context & {
   readonly fds: Record<number, FileDescriptor>;

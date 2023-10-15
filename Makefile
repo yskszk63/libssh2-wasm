@@ -45,7 +45,6 @@ openssl_configure_opts += --with-rand-seed=devrandom
 openssl_cflags  = $(CFLAGS)
 
 openssl_cppflags  = $(CPPFLAGS)
-openssl_cppflags += -DDEVRANDOM=\"\\\"/dev/urandom\\\"\"
 
 openssl_ldflags  = $(LDFLAGS)
 

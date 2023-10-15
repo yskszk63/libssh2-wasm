@@ -103,3 +103,18 @@ export type ciovec = {
   buf: PointerU8;
   buf_len: size;
 };
+
+export type device = bigint & { __deviceBranded: never };
+export type inode = bigint & { __inodeBranded: never };
+export type linkcount = bigint & { __linkcountBranded: never };
+
+export type filestat = {
+  dev: device;
+  ino: inode;
+  filetype: filetype;
+  nlink: linkcount;
+  size: filesize;
+  atime: timestamp;
+  mtime: timestamp;
+  ctime: timestamp;
+};

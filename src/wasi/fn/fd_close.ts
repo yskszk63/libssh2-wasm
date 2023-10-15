@@ -9,6 +9,7 @@ export function fd_close(cx: FdsContext, fd: ty.fd): ty.errno {
   }
 
   switch (fdi.type) {
+    case "random":
     case "dir": {
       delete cx.fds[fd];
       return errno.success;
