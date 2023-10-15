@@ -195,13 +195,18 @@ export class Wasi {
     const reader = readable.getReader({ mode: "byob" });
     stack.defer(() => reader.releaseLock());
 
-    const { done, value } = await reader.read(fdi.recv.buf);
-    console.log(value);
+    const { done, value } = await reader.read(
+      new Uint8Array(fdi.recv.buf.buffer, fdi.recv.buf.byteOffset),
+    );
     fdi.recv.state = "idle";
     if (done) {
       // TODO
       return;
     }
-    fdi.recv.buf = value;
+    fdi.recv.buf = new Uint8Array(
+      value.buffer,
+      0,
+      value.byteOffset + value.byteLength,
+    );
   }
 }

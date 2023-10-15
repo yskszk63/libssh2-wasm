@@ -119,31 +119,13 @@ export function poll_oneoff(
       case "fd_read": {
         const fdi = cx.fds[subscription.u.value.file_descriptor];
         if (fdi.type !== "sock" || fdi.state !== "connected") {
-          events.push({
-            userdata: subscription.userdata,
-            error: errno.inval,
-            type: eventtype.fd_read,
-            fd_readwrite: null,
-          });
           continue;
         }
-        console.log(subscription, fdi.recv);
         if (fdi.recv.state !== "idle") {
-          events.push({
-            userdata: subscription.userdata,
-            error: errno.again,
-            type: eventtype.fd_read,
-            fd_readwrite: null,
-          });
+          continue;
         }
         if (fdi.recv.buf.byteLength < 1) {
-          fdi.recv.state = "insufficient";
-          events.push({
-            userdata: subscription.userdata,
-            error: errno.again,
-            type: eventtype.fd_read,
-            fd_readwrite: null,
-          });
+          continue;
         }
 
         events.push({
@@ -163,21 +145,10 @@ export function poll_oneoff(
       case "fd_write": {
         const fdi = cx.fds[subscription.u.value.file_descriptor];
         if (fdi.type !== "sock" || fdi.state !== "connected") {
-          events.push({
-            userdata: subscription.userdata,
-            error: errno.inval,
-            type: eventtype.fd_write,
-            fd_readwrite: null,
-          });
           continue;
         }
         if (fdi.send.state !== "idle" || fdi.send.buf.byteLength < 1) {
-          events.push({
-            userdata: subscription.userdata,
-            error: errno.again,
-            type: eventtype.fd_write,
-            fd_readwrite: null,
-          });
+          continue;
         }
 
         events.push({

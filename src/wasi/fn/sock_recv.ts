@@ -39,6 +39,7 @@ export function sock_recv(
 
   const { recv } = fdi;
   if (recv.state !== "idle" || recv.buf.byteLength < 1) {
+    fdi.recv.state = "insufficient";
     return errno.again;
   }
 
@@ -53,7 +54,7 @@ export function sock_recv(
 
     const len = Math.min(iovec.buf_len, src.byteLength);
     new Uint8Array(cx.memory.buffer, iovec.buf, len).set(
-      src.subarray(src.byteOffset + n, src.byteLength - n),
+      src.subarray(n, len),
     );
     n += len;
 

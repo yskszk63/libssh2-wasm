@@ -63,6 +63,7 @@ export function path_open(
 
   const name = new Uint8Array(cx.memory.buffer, path, path_len);
   const pathname = decodePath(parent.name, name);
+  console.log(pathname);
 
   let _m: URLPatternResult | null;
   if ((_m = socketPattern.exec({ pathname })) !== null) {
