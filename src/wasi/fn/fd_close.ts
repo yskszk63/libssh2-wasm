@@ -5,7 +5,7 @@ import * as errno from "@/wasi/define/errno.ts";
 export function fd_close(cx: FdsContext, fd: ty.fd): ty.errno {
   const fdi = cx.fds[fd];
   if (typeof fdi === "undefined") {
-    return errno.noent;
+    return errno.badf;
   }
 
   switch (fdi.type) {

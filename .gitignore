@@ -1,3 +1,5 @@
 libssh2.wasm
 deps/
 src/libssh2.wasm.js
+cov_profile.lcov
+cov_profile/

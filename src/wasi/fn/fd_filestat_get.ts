@@ -1,7 +1,6 @@
 import type { FdsContext } from "@/wasi/context.ts";
 import type * as ty from "@/wasi/ty/mod.ts";
 import * as errno from "@/wasi/define/errno.ts";
-import * as filetype from "@/wasi/define/filetype.ts";
 
 function encodeFilestat(view: DataView, value: ty.filestat) {
   view.setBigUint64(0, value.dev, true);
@@ -25,48 +24,15 @@ export function fd_filestat_get(
   }
 
   const view = new DataView(cx.memory.buffer, result);
-  switch (fdi.type) {
-    case "dir": {
-      encodeFilestat(view, {
-        dev: 1n as ty.device, // TODO
-        ino: 1n as ty.inode, // TODO
-        filetype: filetype.directory,
-        nlink: 1n as ty.linkcount,
-        size: 0n as ty.filesize, // TODO
-        atime: 0n as ty.timestamp,
-        mtime: 0n as ty.timestamp,
-        ctime: 0n as ty.timestamp,
-      });
-      return errno.success;
-    }
-
-    case "random": {
-      encodeFilestat(view, {
-        dev: 1n as ty.device, // TODO
-        ino: 1n as ty.inode, // TODO
-        filetype: filetype.character_device,
-        nlink: 1n as ty.linkcount,
-        size: 0n as ty.filesize, // TODO
-        atime: 0n as ty.timestamp,
-        mtime: 0n as ty.timestamp,
-        ctime: 0n as ty.timestamp,
-      });
-      return errno.success;
-    }
-
-    case "sock": {
-      encodeFilestat(view, {
-        dev: 1n as ty.device, // TODO
-        ino: 1n as ty.inode, // TODO
-        filetype: filetype.character_device,
-        nlink: 1n as ty.linkcount,
-        size: 0n as ty.filesize, // TODO
-        atime: 0n as ty.timestamp,
-        mtime: 0n as ty.timestamp,
-        ctime: 0n as ty.timestamp,
-      });
-      return errno.success;
-    }
-  }
-  // return errno.badf;
+  encodeFilestat(view, {
+    dev: 1n as ty.device, // TODO
+    ino: 1n as ty.inode, // TODO
+    filetype: fdi.stat.fs_filetype,
+    nlink: 1n as ty.linkcount,
+    size: 0n as ty.filesize, // TODO
+    atime: 0n as ty.timestamp,
+    mtime: 0n as ty.timestamp,
+    ctime: 0n as ty.timestamp,
+  });
+  return errno.success;
 }

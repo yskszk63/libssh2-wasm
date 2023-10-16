@@ -9,7 +9,7 @@ export function fd_fdstat_get(
 ): ty.errno {
   const { stat } = cx.fds[fd] ?? {};
   if (typeof stat === "undefined") {
-    return errno.badf;
+    return errno.noent;
   }
 
   const view = new DataView(cx.memory.buffer);

@@ -59,3 +59,7 @@ export type FdsContext = Context & {
   readonly fds: Record<number, FileDescriptor>;
   nextfd: number;
 };
+
+export type ClockContext = Context & {
+  now?: () => number;
+};

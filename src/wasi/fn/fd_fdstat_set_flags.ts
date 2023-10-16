@@ -9,7 +9,7 @@ export function fd_fdstat_set_flags(
 ): ty.errno {
   const fdi = cx.fds[fd];
   if (typeof fdi === "undefined") {
-    return errno.badf;
+    return errno.noent;
   }
 
   fdi.stat.fs_flags = flags;

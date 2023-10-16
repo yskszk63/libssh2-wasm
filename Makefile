@@ -112,9 +112,14 @@ $(openssl_tar_gz):
 	curl -sSfL $(openssl_url) -o $@
 
 
-.PHONY: clean test
+.PHONY: clean test cov
 test:
-	deno task test
+	$(RM) -r cov_profile
+	deno task test --coverage=cov_profile
+
+cov: test
+	deno coverage cov_profile --lcov --output=cov_profile.lcov
+	genhtml -o cov_profile/html cov_profile.lcov --ignore-errors unmapped
 
 clean:
 	$(RM) -rf deps libssh2.wasm
