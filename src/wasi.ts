@@ -88,7 +88,7 @@ export class Wasi {
         path_filestat_get: notImplemented.bind(null, "path_filestat_get"),
         path_open: wasi.path_open.bind(null, this),
 
-        poll_oneoff: wasi.poll_oneoff.bind(null, this),
+        poll_oneoff: notImplemented.bind(null, "poll_oneoff"),
 
         proc_exit: wasi.proc_exit.bind(null, this),
         random_get: wasi.random_get.bind(null, this),

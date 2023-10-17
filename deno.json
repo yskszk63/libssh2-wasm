@@ -8,6 +8,6 @@
     "@/": "./src/"
   },
   "fmt": {
-    "exclude": ["./deps/"]
+    "exclude": ["./deps/", "./cov_profile/"]
   }
 }

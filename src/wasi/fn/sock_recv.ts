@@ -36,22 +36,21 @@ export function sock_recv(
   let n = 0;
   const src = recv.buf;
   for (const iovec of decodeIovecArray(view, ri_data, ri_data_len)) {
-    if (n > src.byteLength) {
+    if (n >= src.byteLength) {
       break;
     }
 
-    const len = Math.min(iovec.buf_len, src.byteLength);
+    const len = Math.min(iovec.buf_len, src.byteLength - n);
     new Uint8Array(cx.memory.buffer, iovec.buf, len).set(
-      src.subarray(n, len),
+      new Uint8Array(src.buffer, n, len),
     );
     n += len;
-
-    recv.buf = new Uint8Array(
-      src.buffer,
-      src.byteOffset + n,
-      src.byteLength - n,
-    );
   }
+  recv.buf = new Uint8Array(
+    src.buffer,
+    src.byteOffset + n,
+    src.byteLength - n,
+  );
 
   view.setUint32(result, n, true);
   return errno.success;

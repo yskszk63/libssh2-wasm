@@ -1,3 +1,4 @@
+// FIXME unnecessary???
 import type { FdsContext } from "@/wasi/context.ts";
 import type * as ty from "@/wasi/ty/mod.ts";
 import * as errno from "@/wasi/define/errno.ts";

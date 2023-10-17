@@ -9,6 +9,6 @@ export * from "@/wasi/fn/fd_read.ts";
 export * from "@/wasi/fn/path_open.ts";
 export * from "@/wasi/fn/proc_exit.ts";
 export * from "@/wasi/fn/random_get.ts";
-export * from "@/wasi/fn/poll_oneoff.ts";
+// export * from "@/wasi/fn/poll_oneoff.ts";
 export * from "@/wasi/fn/sock_recv.ts";
 export * from "@/wasi/fn/sock_send.ts";
