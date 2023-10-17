@@ -61,5 +61,9 @@ export type FdsContext = Context & {
 };
 
 export type ClockContext = Context & {
-  now?: () => number;
+  now?: () => number | undefined;
+};
+
+export type RandomContext = Context & {
+  crypto?: Pick<Crypto, "getRandomValues"> | undefined;
 };
