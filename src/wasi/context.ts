@@ -10,16 +10,16 @@ type DirFd = {
   stat: ty.fdstat;
 };
 
-type SockFdRecvState =
-  & {
-    buf: Uint8Array;
-  }
-  & ({
-    state: "idle" | "insufficient" | "busy"; // interest??
-  } | {
-    state: "err";
-    error: unknown;
-  });
+type SockFdRecvState = {
+  state: "idle" | "insufficient" | "busy"; // interest??
+  buf: Uint8Array;
+} | {
+  state: "eof";
+  buf?: Uint8Array | undefined;
+} | {
+  state: "err";
+  error: unknown;
+};
 
 type SockFdSendState =
   & {

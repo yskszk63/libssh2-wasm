@@ -26,15 +26,35 @@ export function sock_recv(
   }
 
   const { recv } = fdi;
-  if (recv.state !== "idle" || recv.buf.byteLength < 1) {
-    fdi.recv.state = "insufficient";
-    return errno.again;
-  }
-
   const view = new DataView(cx.memory.buffer);
 
+  switch (recv.state) {
+    case "idle":
+      if (recv.buf.byteLength < 1) {
+        fdi.recv.state = "insufficient";
+        return errno.again;
+      }
+      break;
+
+    case "insufficient":
+      return errno.again;
+
+    case "busy":
+      return errno.busy;
+
+    case "eof":
+      if (typeof recv.buf === "undefined" || recv.buf.byteLength < 1) {
+        view.setUint32(result, 0, true);
+        return errno.success;
+      }
+      break;
+
+    case "err":
+      return errno.badf;
+  }
+
   let n = 0;
-  const src = recv.buf;
+  const src = recv.buf!; // It should not be undefined.
   for (const iovec of decodeIovecArray(view, ri_data, ri_data_len)) {
     if (n >= src.byteLength) {
       break;

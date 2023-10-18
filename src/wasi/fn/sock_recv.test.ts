@@ -127,6 +127,206 @@ describe("sock_recv", () => {
       ),
       errno.again,
     );
+
+    assert.assertEquals(
+      sock_recv(
+        cx,
+        0 as ty.fd,
+        0 as ty.PointerU8,
+        1 as ty.size,
+        0 as ty.riflags,
+        24,
+      ),
+      errno.again,
+    );
+  });
+
+  it("eof", () => {
+    const cx = {
+      memory: new WebAssembly.Memory({ initial: 32 }),
+      fds: {
+        0: {
+          type: "sock" as const,
+          stat: {
+            fs_filetype: filetype.socket_stream,
+            fs_flags: 0 as ty.fdflags,
+            fs_rights_base: rights.fd_read,
+            fs_rights_inheriting: 0n as ty.rights,
+          },
+          abort: new AbortController(),
+          state: "connected" as const,
+          recv: {
+            state: "eof" as const,
+            buf: new Uint8Array(0) as Uint8Array | undefined,
+          },
+          send: {
+            state: "idle" as const,
+            buf: Uint8Array.from([]),
+          },
+        },
+      },
+      nextfd: 0,
+    };
+    const view = new DataView(cx.memory.buffer);
+    view.setUint32(0, 8, true);
+    view.setUint32(4, 16, true);
+    assert.assertEquals(
+      sock_recv(
+        cx,
+        0 as ty.fd,
+        0 as ty.PointerU8,
+        1 as ty.size,
+        0 as ty.riflags,
+        24,
+      ),
+      errno.success,
+    );
+    assert.assertEquals(view.getUint32(8, true), 0);
+
+    delete cx.fds[0].recv.buf;
+    assert.assertEquals(
+      sock_recv(
+        cx,
+        0 as ty.fd,
+        0 as ty.PointerU8,
+        1 as ty.size,
+        0 as ty.riflags,
+        24,
+      ),
+      errno.success,
+    );
+    assert.assertEquals(view.getUint32(8, true), 0);
+  });
+
+  it("eof buf has buffer", () => {
+    const cx = {
+      memory: new WebAssembly.Memory({ initial: 32 }),
+      fds: {
+        0: {
+          type: "sock" as const,
+          stat: {
+            fs_filetype: filetype.socket_stream,
+            fs_flags: 0 as ty.fdflags,
+            fs_rights_base: rights.fd_read,
+            fs_rights_inheriting: 0n as ty.rights,
+          },
+          abort: new AbortController(),
+          state: "connected" as const,
+          recv: {
+            state: "eof" as const,
+            buf: Uint8Array.from([0xFF]),
+          },
+          send: {
+            state: "idle" as const,
+            buf: Uint8Array.from([]),
+          },
+        },
+      },
+      nextfd: 0,
+    };
+    const view = new DataView(cx.memory.buffer);
+    view.setUint32(0, 8, true);
+    view.setUint32(4, 16, true);
+    assert.assertEquals(
+      sock_recv(
+        cx,
+        0 as ty.fd,
+        0 as ty.PointerU8,
+        1 as ty.size,
+        0 as ty.riflags,
+        32,
+      ),
+      errno.success,
+    );
+    assert.assertEquals(view.getUint32(32, true), 1);
+    assert.assertEquals(
+      new Uint8Array(cx.memory.buffer, 8, 16),
+      Uint8Array.from(Uint8Array.from([0xFF].concat(new Array(15).fill(0)))),
+    );
+  });
+
+  it("err", () => {
+    const cx = {
+      memory: new WebAssembly.Memory({ initial: 32 }),
+      fds: {
+        0: {
+          type: "sock" as const,
+          stat: {
+            fs_filetype: filetype.socket_stream,
+            fs_flags: 0 as ty.fdflags,
+            fs_rights_base: rights.fd_read,
+            fs_rights_inheriting: 0n as ty.rights,
+          },
+          abort: new AbortController(),
+          state: "connected" as const,
+          recv: {
+            state: "err" as const,
+            error: new Error(),
+          },
+          send: {
+            state: "idle" as const,
+            buf: Uint8Array.from([]),
+          },
+        },
+      },
+      nextfd: 0,
+    };
+    const view = new DataView(cx.memory.buffer);
+    view.setUint32(0, 8, true);
+    view.setUint32(4, 16, true);
+    assert.assertEquals(
+      sock_recv(
+        cx,
+        0 as ty.fd,
+        0 as ty.PointerU8,
+        1 as ty.size,
+        0 as ty.riflags,
+        24,
+      ),
+      errno.badf,
+    );
+  });
+
+  it("busy", () => {
+    const cx = {
+      memory: new WebAssembly.Memory({ initial: 32 }),
+      fds: {
+        0: {
+          type: "sock" as const,
+          stat: {
+            fs_filetype: filetype.socket_stream,
+            fs_flags: 0 as ty.fdflags,
+            fs_rights_base: rights.fd_read,
+            fs_rights_inheriting: 0n as ty.rights,
+          },
+          abort: new AbortController(),
+          state: "connected" as const,
+          recv: {
+            state: "busy" as const,
+            buf: Uint8Array.from([]),
+          },
+          send: {
+            state: "idle" as const,
+            buf: Uint8Array.from([]),
+          },
+        },
+      },
+      nextfd: 0,
+    };
+    const view = new DataView(cx.memory.buffer);
+    view.setUint32(0, 8, true);
+    view.setUint32(4, 16, true);
+    assert.assertEquals(
+      sock_recv(
+        cx,
+        0 as ty.fd,
+        0 as ty.PointerU8,
+        1 as ty.size,
+        0 as ty.riflags,
+        24,
+      ),
+      errno.busy,
+    );
   });
 
   it("socket", () => {
