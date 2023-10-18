@@ -4,7 +4,7 @@ export type Context = {
   readonly memory: WebAssembly.Memory;
 };
 
-type DirFd = {
+export type DirFd = {
   type: "dir";
   name: Uint8Array;
   stat: ty.fdstat;
@@ -32,23 +32,33 @@ type SockFdSendState =
     error: unknown;
   });
 
-type SockFd =
-  & {
-    type: "sock";
-    stat: ty.fdstat;
-    abort: AbortController;
-  }
-  & ({
-    state: "opened" | "connecting";
-    recvbuf: ArrayBuffer;
-    sendbuf: ArrayBuffer;
-  } | {
-    state: "connected";
-    recv: SockFdRecvState;
-    send: SockFdSendState;
-  });
+type SockFdBase = {
+  type: "sock";
+  stat: ty.fdstat;
+  abort: AbortController;
+};
 
-type RandomFd = {
+export type SockFdOpened = SockFdBase & {
+  state: "opened";
+  recvbuf: ArrayBuffer;
+  sendbuf: ArrayBuffer;
+};
+
+export type SockFdConnecting = SockFdBase & {
+  state: "connecting";
+  recvbuf: ArrayBuffer;
+  sendbuf: ArrayBuffer;
+};
+
+export type SockFdConnected = SockFdBase & {
+  state: "connected";
+  recv: SockFdRecvState;
+  send: SockFdSendState;
+};
+
+export type SockFd = SockFdOpened | SockFdConnecting | SockFdConnected;
+
+export type RandomFd = {
   type: "random";
   stat: ty.fdstat;
 };

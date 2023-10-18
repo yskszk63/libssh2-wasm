@@ -2,6 +2,7 @@ import * as wasi from "@/wasi/mod.ts";
 import * as filetype from "@/wasi/define/filetype.ts";
 import * as rights from "@/wasi/define/rights.ts";
 import { poll } from "@/wasi/poll.ts";
+import { connect } from "@/wasi/connect.ts";
 
 type InitializeInstance = WebAssembly.Instance & {
   exports: {
@@ -14,7 +15,7 @@ function notImplemented(name: string, ...args: unknown[]): never {
   throw new Error(`Not implemented: ${name} ${args}`);
 }
 
-export interface connect {
+export interface ConnectFn {
   (
     hostname: string,
     port: number,
@@ -24,7 +25,7 @@ export interface connect {
 
 export class Wasi {
   #memory: WebAssembly.Memory | undefined;
-  #connect: connect;
+  connectfn: ConnectFn;
   fds: Record<number, wasi.FileDescriptor> = {
     3: {
       type: "dir",
@@ -42,8 +43,8 @@ export class Wasi {
   readables: Record<number, ReadableStream> = {};
   writables: Record<number, WritableStream> = {};
 
-  constructor(connect: connect) {
-    this.#connect = connect;
+  constructor(connectfn: ConnectFn) {
+    this.connectfn = connectfn;
   }
 
   get memory(): WebAssembly.Memory {
@@ -91,56 +92,6 @@ export class Wasi {
     instance.exports._initialize();
   }
 
-  async connect(fd: number, hostname: string, port: number): Promise<void> {
-    let fdi = this.fds[fd];
-    if (
-      typeof fdi === "undefined" || fdi.type !== "sock" ||
-      fdi.state !== "opened"
-    ) {
-      throw new Error("Bad file descriptor.");
-    }
-
-    this.fds[fd] = {
-      ...fdi,
-      state: "connecting",
-    };
-
-    const [readable, writable] = await this.#connect(
-      hostname,
-      port,
-      fdi.abort.signal,
-    );
-
-    fdi = this.fds[fd];
-    if (
-      typeof fdi === "undefined" || fdi.type !== "sock" ||
-      fdi.state !== "connecting"
-    ) {
-      throw new Error("Bad file descriptor.");
-    }
-
-    const { type, stat, abort, recvbuf, sendbuf } = fdi;
-    this.fds[fd] = {
-      type,
-      stat,
-      abort,
-      state: "connected",
-      recv: {
-        state: "idle",
-        buf: new Uint8Array(recvbuf, 0, 0),
-      },
-      send: {
-        state: "idle",
-        buf: new Uint8Array(sendbuf),
-      },
-    };
-    fdi.abort.signal.addEventListener("abort", () => {
-      delete this.readables[fd];
-      delete this.writables[fd];
-    });
-    this.readables[fd] = readable;
-    this.writables[fd] = writable;
-  }
-
   poll = poll.bind(null, this);
+  connect = connect.bind(null, this);
 }

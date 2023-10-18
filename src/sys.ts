@@ -1,5 +1,5 @@
 import { compile } from "@/libssh2.wasm.js";
-import { type connect, Wasi } from "@/wasi.ts";
+import { type ConnectFn, Wasi } from "@/wasi.ts";
 
 interface Exports {
   memory: WebAssembly.Memory;
@@ -75,7 +75,7 @@ const module = await compile();
 export const LIBSSH2_INIT_NO_CRYPTO = 0x0001;
 
 export class Libssh2Sys {
-  static async instantiate(connect: connect): Promise<Libssh2Sys> {
+  static async instantiate(connect: ConnectFn): Promise<Libssh2Sys> {
     const wasi = new Wasi(connect);
 
     const instance = await WebAssembly.instantiate(module, {
