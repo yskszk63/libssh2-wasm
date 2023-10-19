@@ -62,7 +62,7 @@ export function sock_recv(
 
     const len = Math.min(iovec.buf_len, src.byteLength - n);
     new Uint8Array(cx.memory.buffer, iovec.buf, len).set(
-      new Uint8Array(src.buffer, n, len),
+      new Uint8Array(src.buffer, src.byteOffset + n, len),
     );
     n += len;
   }
