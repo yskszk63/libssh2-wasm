@@ -1,6 +1,6 @@
 {
   "tasks": {
-    "test": "deno test --allow-read=./src/__snapshots__",
+    "test": "deno test --allow-read=./src/__snapshots__ --allow-run=/usr/sbin/sshd --allow-net=localhost:2222",
     "test:update": "deno task test --allow-write=./src/__snapshots__ -- --update"
   },
   "imports": {

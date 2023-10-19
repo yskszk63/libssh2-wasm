@@ -115,7 +115,7 @@ $(openssl_tar_gz):
 .PHONY: clean test cov
 test:
 	$(RM) -r cov_profile
-	deno task test --coverage=cov_profile
+	deno task test --coverage=cov_profile --parallel
 
 cov: test
 	deno coverage cov_profile --lcov --output=cov_profile.lcov

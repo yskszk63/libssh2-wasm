@@ -28,8 +28,10 @@ type Instance = {
   exports: WebAssembly.Exports & Exports;
 };
 
-// deno-lint-ignore ban-types
-function assertsFn(name: string, value: unknown): asserts value is Function {
+function assertsFn(
+  name: string,
+  value: unknown,
+): asserts value is CallableFunction {
   if (typeof value !== "function") {
     throw new Error(`${name} is not typeof function`);
   }
