@@ -44,8 +44,9 @@ async function startSshd(signal: AbortSignal) {
     ],
     signal,
     stdin: "null",
-    stdout: "inherit",
-    stderr: "inherit",
+    stdout: "null",
+    //stderr: "inherit",
+    stderr: "null",
   });
 
   const proc = cmd.spawn();

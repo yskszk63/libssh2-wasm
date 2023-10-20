@@ -1,4 +1,4 @@
-import type { FdsContext } from "@/wasi/context.ts";
+import type { FdsContext, SockFdConnected } from "@/wasi/context.ts";
 
 class DisposableStack {
   #callbacks: (() => void)[] = [];
@@ -19,39 +19,42 @@ type This = Pick<FdsContext, "fds"> & {
   writables: Record<number, WritableStream>;
 };
 
-export async function poll(cx: This, fd: number) {
+async function pollSend(
+  fd: number,
+  fdi: SockFdConnected,
+  writable: WritableStream | undefined,
+) {
+  if (fdi.send.state !== "idle" || fdi.send.buf.byteOffset < 1) {
+    return;
+  }
+
   using stack = new DisposableStack();
 
-  const fdi = cx.fds[fd];
-  if (typeof fdi === "undefined" || fdi.type !== "sock") {
-    throw new Error(`Invalid ${fdi?.type}`);
+  if (typeof writable === "undefined") {
+    throw new Error(`No writable: ${fd}`);
   }
 
-  if (fdi.state !== "connected") {
-    return;
-  }
-  if (fdi.send.state === "idle" && fdi.send.buf.byteOffset > 0) {
-    const writable = cx.writables[fd];
-    if (typeof writable === "undefined") {
-      throw new Error(`No writable: ${fd}`);
-    }
+  // using writer = stack.adopt(writable.getWriter(), v => v.releaseLock());
+  const writer = writable.getWriter();
+  stack.defer(() => writer.releaseLock());
 
-    // using writer = stack.adopt(writable.getWriter(), v => v.releaseLock());
-    const writer = writable.getWriter();
-    stack.defer(() => writer.releaseLock());
+  await writer.write(
+    new Uint8Array(fdi.send.buf.buffer, 0, fdi.send.buf.byteOffset),
+  );
+  fdi.send.buf = new Uint8Array(fdi.send.buf.buffer);
+}
 
-    await writer.write(
-      new Uint8Array(fdi.send.buf.buffer, 0, fdi.send.buf.byteOffset),
-    );
-    fdi.send.buf = new Uint8Array(fdi.send.buf.buffer);
-    return;
-  }
-
+async function pollRecv(
+  fd: number,
+  fdi: SockFdConnected,
+  readable: ReadableStream | undefined,
+) {
   if (fdi.recv.state !== "insufficient") {
     return;
   }
 
-  const readable = cx.readables[fd];
+  using stack = new DisposableStack();
+
   if (typeof readable === "undefined") {
     throw new Error(`No readable: ${fd}`);
   }
@@ -70,4 +73,25 @@ export async function poll(cx: This, fd: number) {
   }
   fdi.recv.state = "idle";
   fdi.recv.buf = value;
+}
+
+type Interest = "both" | "recv" | "send";
+
+export async function poll(cx: This, fd: number, interest: Interest = "both") {
+  const fdi = cx.fds[fd];
+  if (typeof fdi === "undefined" || fdi.type !== "sock") {
+    throw new Error(`Invalid ${fdi?.type}`);
+  }
+
+  if (fdi.state !== "connected") {
+    return;
+  }
+
+  if (interest === "both" || interest === "send") {
+    await pollSend(fd, fdi, cx.writables[fd]);
+  }
+
+  if (interest === "both" || interest === "recv") {
+    await pollRecv(fd, fdi, cx.readables[fd]);
+  }
 }
