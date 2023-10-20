@@ -4,6 +4,47 @@ interface Allocator {
   free(ptr: number): void;
 }
 
+export class OpaquePointer {
+  #memory: WebAssembly.Memory;
+  #ptr: number;
+  #length: number | undefined;
+
+  constructor(
+    memory: WebAssembly.Memory,
+    ptr: number,
+    length: number | undefined,
+  ) {
+    if (ptr === 0) {
+      throw new Error("Null pointer.");
+    }
+
+    this.#memory = memory;
+    this.#ptr = ptr;
+    this.#length = length;
+  }
+
+  get ptr() {
+    if (this.#ptr === 0) {
+      throw new Error("Invalid reference.");
+    }
+
+    return this.#ptr;
+  }
+
+  get length() {
+    return this.#length;
+  }
+
+  str() {
+    let buf = new Uint8Array(this.#memory.buffer, this.ptr, this.length);
+    const n = buf.indexOf(0);
+    if (n !== -1) {
+      buf = buf.subarray(0, n);
+    }
+    return new TextDecoder().decode(buf);
+  }
+}
+
 export class Pointer {
   #allocator: Allocator;
   #ptr: number;
@@ -74,11 +115,21 @@ export class Memory {
     return new Pointer(this.#allocator, ret, size);
   }
 
-  str(text: string): Pointer {
+  str(text: string, nullterm = false): Pointer {
     const buf = new TextEncoder().encode(text);
+    if (nullterm) {
+      const ptr = this.malloc(buf.length);
+      ptr.set(buf);
+      return ptr;
+    }
+
     const ptr = this.malloc(buf.length + 1);
     ptr.set(buf);
     ptr.set([0], buf.length);
     return ptr;
+  }
+
+  deref(ptr: number, length?: number | undefined): OpaquePointer {
+    return new OpaquePointer(this.#allocator.memory, ptr, length);
   }
 }

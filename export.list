@@ -66,7 +66,7 @@ strerror_r
 ##libssh2_channel_write_stderr # libssh2_channel_write_ex
 ##libssh2_channel_x11_req # libssh2_channel_x11_req_ex
 #libssh2_channel_x11_req_ex
-#libssh2_exit
+libssh2_exit
 #libssh2_free
 #libssh2_hostkey_hash
 libssh2_init
@@ -114,8 +114,8 @@ libssh2_session_handshake
 #libssh2_session_hostkey
 ##libssh2_session_init # libssh2_session_init_ex
 libssh2_session_init_ex
-#libssh2_session_last_errno
-#libssh2_session_last_error
+libssh2_session_last_errno
+libssh2_session_last_error
 #libssh2_session_method_pref
 #libssh2_session_methods
 libssh2_session_set_blocking
@@ -171,13 +171,13 @@ libssh2_session_set_blocking
 #libssh2_userauth_hostbased_fromfile_ex
 ##libssh2_userauth_keyboard_interactive # libssh2_userauth_keyboard_interactive_ex
 #libssh2_userauth_keyboard_interactive_ex
-#libssh2_userauth_list
+libssh2_userauth_list
 ##libssh2_userauth_password # libssh2_userauth_password_ex
 #libssh2_userauth_password_ex
 #libssh2_userauth_publickey
 ##libssh2_userauth_publickey_fromfile # libssh2_userauth_publickey_fromfile_ex
 #libssh2_userauth_publickey_fromfile_ex
-#libssh2_userauth_publickey_frommemory
+libssh2_userauth_publickey_frommemory
 #libssh2_version
 
 # vim:set ft=sh:

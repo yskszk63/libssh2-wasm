@@ -145,6 +145,10 @@ snapshot[`snapshot - exports 1`] = `
   },
   {
     kind: "function",
+    name: "libssh2_exit",
+  },
+  {
+    kind: "function",
     name: "libssh2_session_init_ex",
   },
   {
@@ -157,7 +161,23 @@ snapshot[`snapshot - exports 1`] = `
   },
   {
     kind: "function",
+    name: "libssh2_session_last_error",
+  },
+  {
+    kind: "function",
+    name: "libssh2_session_last_errno",
+  },
+  {
+    kind: "function",
     name: "libssh2_session_set_blocking",
+  },
+  {
+    kind: "function",
+    name: "libssh2_userauth_list",
+  },
+  {
+    kind: "function",
+    name: "libssh2_userauth_publickey_frommemory",
   },
 ]
 `;

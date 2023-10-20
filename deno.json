@@ -1,7 +1,7 @@
 {
   "tasks": {
-    "test": "deno test --allow-read=./src/__snapshots__ --allow-run=/usr/sbin/sshd --allow-net=localhost:2222",
-    "test:update": "deno task test --allow-write=./src/__snapshots__ -- --update"
+    "test": "deno test --allow-read=/tmp,./src/__snapshots__ --allow-write=/tmp,./src/__snapshots__ --allow-run=/usr/sbin/sshd,ssh-keygen --allow-net=localhost:2222 --allow-env=USER",
+    "test:update": "deno task test -- --update"
   },
   "imports": {
     "std/": "https://deno.land/std@0.202.0/",

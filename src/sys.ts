@@ -13,6 +13,7 @@ interface Exports {
   strerror_r: (errnum: number, buf: number, buflen: number) => number;
 
   libssh2_init: (flags: number) => number;
+  libssh2_exit: () => void;
   libssh2_session_init_ex: (
     myalloc: number,
     myfree: number,
@@ -22,6 +23,29 @@ interface Exports {
   libssh2_session_free: (session: number) => number;
   libssh2_session_handshake: (session: number, socket: number) => number;
   libssh2_session_set_blocking: (session: number, blocking: number) => void;
+  libssh2_session_last_errno: (session: number) => number;
+  libssh2_session_last_error: (
+    session: number,
+    errmsg: number,
+    errmsg_len: number,
+    want_buf: number,
+  ) => number;
+
+  libssh2_userauth_list: (
+    session: number,
+    username: number,
+    username_len: number,
+  ) => number;
+  libssh2_userauth_publickey_frommemory: (
+    session: number,
+    username: number,
+    username_len: number,
+    publickeydata: number,
+    publickeydata_len: number,
+    privatekeydata: number,
+    privatekeydata_len: number,
+    passphrease: number,
+  ) => number;
 }
 
 type Instance = {
@@ -57,12 +81,26 @@ function assertsExports(
   assertsFn("strerror_r", exports["strerror_r"]);
 
   assertsFn("libssh2_init", exports["libssh2_init"]);
+  assertsFn("libssh2_exit", exports["libssh2_exit"]);
   assertsFn("libssh2_session_init_ex", exports["libssh2_session_init_ex"]);
   assertsFn("libssh2_session_free", exports["libssh2_session_free"]);
   assertsFn("libssh2_session_handshake", exports["libssh2_session_handshake"]);
   assertsFn(
     "libssh2_session_set_blocking",
     exports["libssh2_session_set_blocking"],
+  );
+  assertsFn(
+    "libssh2_session_last_errno",
+    exports["libssh2_session_last_errno"],
+  );
+  assertsFn(
+    "libssh2_session_last_error",
+    exports["libssh2_session_last_error"],
+  );
+  assertsFn("libssh2_userauth_list", exports["libssh2_userauth_list"]);
+  assertsFn(
+    "libssh2_userauth_publickey_frommemory",
+    exports["libssh2_userauth_publickey_frommemory"],
   );
 }
 
@@ -141,6 +179,10 @@ export class Libssh2Sys {
     return this.#instance.exports.libssh2_init(flags);
   }
 
+  libssh2_exit(): void {
+    return this.#instance.exports.libssh2_exit();
+  }
+
   libssh2_session_init_ex(
     myalloc: number,
     myfree: number,
@@ -167,6 +209,58 @@ export class Libssh2Sys {
     return this.#instance.exports.libssh2_session_set_blocking(
       session,
       blocking,
+    );
+  }
+
+  libssh2_session_last_errno(session: number): number {
+    return this.#instance.exports.libssh2_session_last_errno(session);
+  }
+
+  libssh2_session_last_error(
+    session: number,
+    errmsg: number,
+    errmsg_len: number,
+    want_buf: number,
+  ): number {
+    return this.#instance.exports.libssh2_session_last_error(
+      session,
+      errmsg,
+      errmsg_len,
+      want_buf,
+    );
+  }
+
+  libssh2_userauth_list(
+    session: number,
+    username: number,
+    username_len: number,
+  ): number {
+    return this.#instance.exports.libssh2_userauth_list(
+      session,
+      username,
+      username_len,
+    );
+  }
+
+  libssh2_userauth_publickey_frommemory(
+    session: number,
+    username: number,
+    username_len: number,
+    publickeydata: number,
+    publickeydata_len: number,
+    privatekeydata: number,
+    privatekeydata_len: number,
+    passphrease: number,
+  ): number {
+    return this.#instance.exports.libssh2_userauth_publickey_frommemory(
+      session,
+      username,
+      username_len,
+      publickeydata,
+      publickeydata_len,
+      privatekeydata,
+      privatekeydata_len,
+      passphrease,
     );
   }
 }
